@@ -1,1 +1,593 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TUS Asistanı</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Mobil iOS / PWA Ayarları -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3406/3406828.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+    /* iOS'ta kaydırma hissiyatını iyileştirme */
+    .ios-scroll { -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans ios-scroll select-none">
 
+  <!-- ÜST BAR -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 px-4 py-3 flex justify-between items-center">
+    <div class="flex items-center space-x-2">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">T</div>
+      <h1 class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">TUS Asistanı</h1>
+    </div>
+    <div id="authStatus" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 flex items-center gap-1.5 border border-slate-700/50">
+      <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Bağlanıyor...
+    </div>
+  </header>
+
+  <!-- SEKMELER (Altta değil üstte, hızlı erişim) -->
+  <nav class="flex border-b border-slate-900 bg-slate-900/40 text-sm">
+    <button id="tabAddBtn" onclick="switchTab('add')" class="flex-1 py-3 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition-all duration-150">
+      <i class="fa-solid fa-camera mr-1"></i> Soru Çek/Ekle
+    </button>
+    <button id="tabArchiveBtn" onclick="switchTab('archive')" class="flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-300 transition-all duration-150">
+      <i class="fa-solid fa-folder-open mr-1"></i> Arşivim (<span id="archiveCount">0</span>)
+    </button>
+    <button id="tabQuizBtn" onclick="switchTab('quiz')" class="flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-300 transition-all duration-150">
+      <i class="fa-solid fa-brain mr-1"></i> Beni Test Et
+    </button>
+  </nav>
+
+  <!-- ANA İÇERİK -->
+  <main class="flex-1 p-4 max-w-xl mx-auto w-full pb-10">
+    
+    <!-- ============================================== -->
+    <!-- 1. SEKME: KAMERA & SORU EKLE -->
+    <!-- ============================================== -->
+    <section id="sectionAdd" class="space-y-4">
+      
+      <!-- HIZLI MODEL SEÇİCİ -->
+      <div class="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800">
+        <span class="text-xs text-slate-400 font-semibold pl-1"><i class="fa-solid fa-microchip mr-1.5"></i>Yapay Zeka Modeli</span>
+        <div class="flex gap-1 bg-slate-950 p-0.5 rounded-xl border border-slate-800">
+          <!-- Flash varsayılan seçili -->
+          <button id="modelFlash" onclick="setModel('gemini-1.5-flash')" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
+            Flash (Hızlı)
+          </button>
+          <button id="modelPro" onclick="setModel('gemini-1.5-pro')" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 text-slate-400 hover:text-slate-200">
+            Pro (Derin Vaka)
+          </button>
+        </div>
+      </div>
+
+      <!-- DEV KAMERA / FOTOĞRAF ÇEKME KARTI -->
+      <div class="relative">
+        <label class="block group cursor-pointer active:scale-[0.98] transition-transform duration-100">
+          <!-- capture="camera" ve accept="image/*" kamerayı doğrudan tetikler -->
+          <input type="file" id="imageInput" accept="image/*" capture="camera" class="hidden" onchange="handleImageSelect(event)">
+          
+          <div class="w-full aspect-[4/3] bg-gradient-to-b from-indigo-950/30 to-slate-900/80 hover:to-indigo-950/20 border-2 border-dashed border-indigo-500/40 hover:border-indigo-500 rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-4 transition-all duration-200 shadow-xl shadow-indigo-950/10">
+            
+            <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 animate-pulse">
+              <i class="fa-solid fa-camera text-3.5xl"></i>
+            </div>
+            
+            <div class="space-y-1">
+              <h3 class="text-lg font-extrabold tracking-tight text-indigo-300">Sorunun Fotoğrafını Çek</h3>
+              <p class="text-xs text-slate-400 max-w-[250px] mx-auto">Doğrudan kamerayla çek veya galeriden soru yükle</p>
+            </div>
+
+            <!-- Kamera izni/ipucu etiketi -->
+            <span class="text-[10px] uppercase font-extrabold tracking-wider bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20">
+              <i class="fa-solid fa-bolt mr-1"></i> iPhone'da Kamerayı Açar
+            </span>
+          </div>
+        </label>
+      </div>
+
+      <!-- GÖRSEL ÖNİZLEME (FOTOĞRAF ÇEKİLİNCE GÖRÜNÜR) -->
+      <div id="imagePreviewContainer" class="hidden relative rounded-2xl overflow-hidden border border-slate-700 bg-slate-900 shadow-lg">
+        <img id="imagePreview" class="w-full max-h-[250px] object-contain bg-slate-950" />
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent flex items-end justify-between p-3">
+          <span class="text-xs bg-indigo-600/90 text-white font-bold px-2 py-1 rounded-md flex items-center gap-1">
+            <i class="fa-regular fa-image"></i> Soru Yakalandı
+          </span>
+          <button onclick="clearImage()" class="bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition">
+            <i class="fa-solid fa-trash-can"></i> Sil
+          </button>
+        </div>
+      </div>
+
+      <!-- METİN GİRİŞİ (KAMERANIN ALTINDA) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <i class="fa-solid fa-pen-nib text-indigo-400"></i> Veya Metin Olarak Ekle
+          </label>
+          <span class="text-[10px] text-slate-500">(Notlar, spotlar ya da kopyaladığın sorular)</span>
+        </div>
+        
+        <textarea id="questionInput" rows="3" placeholder="Soruyu buraya yazabilir veya fotoğrafın üzerine ek açıklama/not ekleyebilirsin..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"></textarea>
+
+        <!-- ANALİZ ET BUTONU -->
+        <button id="analyzeBtn" onclick="analyzeAndSaveQuestion()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2.5 transition active:scale-[0.98]">
+          <i class="fa-solid fa-brain"></i>
+          <span>Analiz Et & Arşivle</span>
+        </button>
+      </div>
+
+      <!-- ÇÖZÜM SONUÇ KARTI -->
+      <div id="resultCard" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="resBadge" class="text-xs px-3 py-1 rounded-lg bg-indigo-950 border border-indigo-700/50 text-indigo-300 font-extrabold">BRANŞ</span>
+            <span id="resSubBadge" class="text-xs font-bold text-slate-400">Konu</span>
+          </div>
+          <span class="text-[10px] text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded-md border border-emerald-800/40 font-bold"><i class="fa-regular fa-circle-check mr-1"></i> Arşive Kaydedildi</span>
+        </div>
+
+        <div class="space-y-1.5">
+          <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-lightbulb text-amber-400"></i> Akılda Kalıcı Spot Not (Key Takeaway)
+          </h3>
+          <p id="resKeyTakeaway" class="text-sm font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-900/60 p-3 rounded-xl leading-snug"></p>
+        </div>
+
+        <div class="space-y-1.5">
+          <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-graduation-cap text-indigo-400"></i> Detaylı Patofizyoloji & Çözüm
+          </h3>
+          <div id="resExplanation" class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-950 p-3.5 rounded-xl border border-slate-800 max-h-[300px] overflow-y-auto"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- 2. SEKME: ARŞİV / HATALAR -->
+    <!-- ============================================== -->
+    <section id="sectionArchive" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-extrabold text-slate-200">Hata Kütüphanen</h2>
+          <p class="text-xs text-slate-500">Çözemediğin TUS soruları ve AI analizleri</p>
+        </div>
+        <button onclick="loadUserQuestions()" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1"><i class="fa-solid fa-rotate-right"></i> Yenile</button>
+      </div>
+
+      <!-- Filtreleme (Branşlar) -->
+      <div id="branchFilters" class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+        <!-- JS ile dinamik doldurulacak -->
+      </div>
+
+      <div id="questionsList" class="space-y-3">
+        <div class="text-center py-10 text-slate-600 text-sm">Sorularınız yükleniyor...</div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- 3. SEKME: BENİ TEST ET -->
+    <!-- ============================================== -->
+    <section id="sectionQuiz" class="hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3 text-center">
+        <div class="w-12 h-12 rounded-full bg-indigo-950 border border-indigo-700/50 flex items-center justify-center text-indigo-400 mx-auto">
+          <i class="fa-solid fa-brain text-xl animate-pulse"></i>
+        </div>
+        <div class="space-y-1">
+          <h2 class="text-base font-extrabold text-slate-200">Akıllı Quiz & Tekrar</h2>
+          <p class="text-xs text-slate-400 max-w-[280px] mx-auto">Hatalı olduğun konulardan Gemini sana özel yeni ve zorlayıcı bir TUS vaka sorusu üretsin.</p>
+        </div>
+        <button onclick="generateQuiz()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold py-3 rounded-xl shadow-lg transition active:scale-98">
+          Hemen Yeni Soru Üret
+        </button>
+      </div>
+
+      <!-- QUIZ SORU KARTI -->
+      <div id="quizContainer" class="hidden bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <span class="text-[10px] uppercase font-extrabold tracking-wider bg-indigo-950 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20">AKILLI TEST</span>
+          <span id="quizSubBadge" class="text-xs font-bold text-slate-400">Yükleniyor...</span>
+        </div>
+
+        <!-- Soru Metni -->
+        <p id="quizQuestion" class="text-sm font-semibold text-slate-200 leading-relaxed"></p>
+
+        <!-- Seçenekler -->
+        <div id="quizOptions" class="space-y-2">
+          <!-- Dinamik Butonlar -->
+        </div>
+
+        <!-- Doğru/Yanlış Çözüm Sonucu -->
+        <div id="quizResult" class="hidden p-4 rounded-xl space-y-2 border">
+          <h4 id="quizResultTitle" class="text-xs font-extrabold uppercase tracking-wider"></h4>
+          <p id="quizExplanation" class="text-xs text-slate-300 leading-relaxed"></p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FIREBASE & UYGULAMA MANTIĞI -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    // Firebase Ayarların
+    const firebaseConfig = {
+      apiKey: "AIzaSyAS-Xf6I1xDlep59iZAphe-PzJFzddS-N8",
+      authDomain: "tusaistanzeka.firebaseapp.com",
+      projectId: "tusaistanzeka",
+      storageBucket: "tusaistanzeka.firebasestorage.app",
+      messagingSenderId: "686279505904",
+      appId: "1:686279505904:web:c6ecfb760106e4476ccf35",
+      measurementId: "G-9SC3CQ1771"
+    };
+
+    // Cloudflare Worker Adresin
+    const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let selectedImageBase64 = null;
+    let selectedImageMime = null;
+    let currentModel = "gemini-1.5-flash"; // Flash varsayılan
+    let allQuestions = [];
+    let selectedBranchFilter = "All";
+
+    // Firebase Oturumunu Başlat (Anonymous)
+    signInAnonymously(auth).catch(err => console.error("Oturum açılamadı:", err));
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        document.getElementById("authStatus").innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Aktif`;
+        loadUserQuestions();
+      } else {
+        document.getElementById("authStatus").innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Bağlantı Yok`;
+      }
+    });
+
+    // Sekmeler Arası Geçiş
+    window.switchTab = (tab) => {
+      document.getElementById("sectionAdd").classList.toggle("hidden", tab !== 'add');
+      document.getElementById("sectionArchive").classList.toggle("hidden", tab !== 'archive');
+      document.getElementById("sectionQuiz").classList.toggle("hidden", tab !== 'quiz');
+
+      document.getElementById("tabAddBtn").className = tab === 'add' 
+        ? "flex-1 py-3 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition" 
+        : "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-300 transition";
+      
+      document.getElementById("tabArchiveBtn").className = tab === 'archive' 
+        ? "flex-1 py-3 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition" 
+        : "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-300 transition";
+      
+      document.getElementById("tabQuizBtn").className = tab === 'quiz' 
+        ? "flex-1 py-3 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition" 
+        : "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-300 transition";
+    };
+
+    // Model Seçici
+    window.setModel = (model) => {
+      currentModel = model;
+      const isPro = model === 'gemini-1.5-pro';
+      
+      document.getElementById("modelFlash").className = isPro
+        ? "text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 text-slate-400 hover:text-slate-200"
+        : "text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 bg-indigo-600 text-white shadow-md shadow-indigo-600/20";
+
+      document.getElementById("modelPro").className = !isPro
+        ? "text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 text-slate-400 hover:text-slate-200"
+        : "text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 bg-indigo-600 text-white shadow-md shadow-indigo-600/20";
+    };
+
+    // Görsel Sıkıştırma ve Base64'e Dönüştürme
+    window.handleImageSelect = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      selectedImageMime = file.type;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Görüntü boyutunu küçültme (Performans ve Kota için)
+          const canvas = document.createElement("canvas");
+          const max_size = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > max_size) {
+              height *= max_size / width;
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width *= max_size / height;
+              height = max_size;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          selectedImageBase64 = canvas.toDataURL(file.type).split(",")[1];
+          
+          document.getElementById("imagePreview").src = canvas.toDataURL(file.type);
+          document.getElementById("imagePreviewContainer").classList.remove("hidden");
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.clearImage = () => {
+      selectedImageBase64 = null;
+      selectedImageMime = null;
+      document.getElementById("imageInput").value = "";
+      document.getElementById("imagePreviewContainer").classList.add("hidden");
+    };
+
+    // Yapay Zekaya Gönder ve Kaydet
+    window.analyzeAndSaveQuestion = async () => {
+      const questionText = document.getElementById("questionInput").value.trim();
+      
+      if (!questionText && !selectedImageBase64) {
+        alert("Lütfen önce bir soru fotoğrafı çekin veya soruyu metin olarak yazın.");
+        return;
+      }
+
+      const btn = document.getElementById("analyzeBtn");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Çözülüyor & Kaydediliyor...`;
+
+      // Gemini'nin JSON üretmesi için şablon
+      const prompt = `
+        Görevin: Aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
+        Lütfen cevabı kesinlikle SADECE ve SADECE şu JSON yapısında dön (başka hiçbir yazı veya markdown olmasın):
+        {
+          "branch": "BRANŞ (Örn: Dahiliye, Pediatri, Anatomi, Biyokimya vb.)",
+          "topic": "KONU (Örn: Hematoloji, Kardiyoloji vb.)",
+          "subTopic": "ALT KONU (Örn: Hemolitik Anemiler)",
+          "keyTakeaway": "Öğrenilmesi gereken, hatayı bir dahaki sefere engelleyecek en önemli SPOT Not (En fazla 2 cümle)",
+          "explanation": "Detaylı patofizyoloji ve doğru/yanlış seçeneklerin analizi"
+        }
+        
+        Soru / Not İçeriği:
+        ${questionText}
+      `;
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: prompt,
+            model: currentModel,
+            imageBase64: selectedImageBase64,
+            mimeType: selectedImageMime
+          })
+        });
+
+        const data = await response.json();
+        
+        let aiResultText = data.candidates[0].content.parts[0].text;
+        
+        // Markdown JSON temizliği
+        aiResultText = aiResultText.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsedResult = JSON.parse(aiResultText);
+
+        // Firestore'a kaydet
+        if (currentUser) {
+          await addDoc(collection(db, "users", currentUser.uid, "questions"), {
+            branch: parsedResult.branch || "Belirtilmemiş",
+            topic: parsedResult.topic || "Genel",
+            subTopic: parsedResult.subTopic || "",
+            rawQuestion: questionText || "[Fotoğraflı Soru]",
+            aiExplanation: parsedResult.explanation,
+            keyTakeaway: parsedResult.keyTakeaway,
+            createdAt: serverTimestamp(),
+            imageUploaded: !!selectedImageBase64
+          });
+        }
+
+        // Arayüzü Güncelle
+        document.getElementById("resBadge").textContent = parsedResult.branch.toUpperCase();
+        document.getElementById("resSubBadge").textContent = parsedResult.topic + (parsedResult.subTopic ? ` > ${parsedResult.subTopic}` : "");
+        document.getElementById("resKeyTakeaway").textContent = parsedResult.keyTakeaway;
+        document.getElementById("resExplanation").textContent = parsedResult.explanation;
+        
+        document.getElementById("resultCard").classList.remove("hidden");
+        document.getElementById("questionInput").value = "";
+        clearImage();
+
+        loadUserQuestions(); // Listeyi yenile
+
+      } catch (err) {
+        console.error("Hata oluştu:", err);
+        alert("Bir hata oluştu. Lütfen tekrar deneyin.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-brain"></i> <span>Analiz Et & Arşivle</span>`;
+      }
+    };
+
+    // Arşivi Getirme
+    window.loadUserQuestions = async () => {
+      if (!currentUser) return;
+
+      try {
+        const q = query(
+          collection(db, "users", currentUser.uid, "questions"), 
+          orderBy("createdAt", "desc")
+        );
+        const snapshot = await getDocs(q);
+        
+        allQuestions = [];
+        snapshot.forEach((doc) => {
+          allQuestions.push({ id: doc.id, ...doc.data() });
+        });
+
+        document.getElementById("archiveCount").textContent = allQuestions.length;
+        renderFilters();
+        renderQuestions();
+      } catch (err) {
+        console.error("Soruları çekerken hata:", err);
+      }
+    };
+
+    // Branş Filtrelerini Hazırlama
+    function renderFilters() {
+      const container = document.getElementById("branchFilters");
+      const branches = ["All", ...new Set(allQuestions.map(q => q.branch))];
+      
+      container.innerHTML = branches.map(b => `
+        <button onclick="setFilter('${b}')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition ${
+          selectedBranchFilter === b 
+            ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/20" 
+            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+        }">${b === 'All' ? 'Tümü' : b}</button>
+      `).join('');
+    }
+
+    window.setFilter = (branch) => {
+      selectedBranchFilter = branch;
+      renderFilters();
+      renderQuestions();
+    };
+
+    // Arşiv Listesini Ekrana Basma
+    function renderQuestions() {
+      const container = document.getElementById("questionsList");
+      const filtered = selectedBranchFilter === "All" 
+        ? allQuestions 
+        : allQuestions.filter(q => q.branch === selectedBranchFilter);
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-10 text-slate-600 text-sm">Burada henüz soru bulunmuyor.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(q => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 hover:border-slate-700 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] px-2.5 py-0.5 rounded-md bg-indigo-950 border border-indigo-700/50 text-indigo-300 font-extrabold">${q.branch.toUpperCase()}</span>
+            <span class="text-[10px] text-slate-500">${q.topic} ${q.subTopic ? ' > ' + q.subTopic : ''}</span>
+          </div>
+          <p class="text-xs text-slate-400 line-clamp-2 italic">${q.rawQuestion}</p>
+          <div class="bg-emerald-950/20 border border-emerald-900/40 p-2.5 rounded-xl">
+            <span class="text-[10px] font-extrabold text-emerald-400 block uppercase mb-0.5"><i class="fa-solid fa-lightbulb"></i> Spot Not</span>
+            <p class="text-xs font-bold text-emerald-300 leading-snug">${q.keyTakeaway}</p>
+          </div>
+          <details class="text-xs text-slate-400">
+            <summary class="cursor-pointer hover:text-slate-300 font-bold py-1">Tüm Çözümü Oku</summary>
+            <p class="mt-2 bg-slate-950 p-3 rounded-lg border border-slate-800 leading-relaxed whitespace-pre-wrap">${q.aiExplanation}</p>
+          </details>
+        </div>
+      `).join('');
+    }
+
+    // ==============================================
+    // AKILLI QUIZ SİSTEMİ (PROMT & SEÇENEK YERLEŞTİRME)
+    // ==============================================
+    window.generateQuiz = async () => {
+      if (allQuestions.length === 0) {
+        alert("Soru üretebilmemiz için önce arşivinizde en az 1-2 adet kayıtlı hatanın bulunması gerekiyor.");
+        return;
+      }
+
+      const container = document.getElementById("quizContainer");
+      container.classList.remove("hidden");
+      document.getElementById("quizQuestion").textContent = "Yapay zeka zayıf konularını tarıyor ve soruyu hazırlıyor, lütfen bekleyin...";
+      document.getElementById("quizOptions").innerHTML = "";
+      document.getElementById("quizResult").classList.add("hidden");
+
+      // Kullanıcının arşivinden rastgele konular seçme
+      const randomIndices = Array.from({length: Math.min(5, allQuestions.length)}, () => Math.floor(Math.random() * allQuestions.length));
+      const chosenContext = randomIndices.map(i => `${allQuestions[i].branch} > ${allQuestions[i].topic} (${allQuestions[i].keyTakeaway})`).join("\n");
+
+      const prompt = `
+        Görevin: Kullanıcının daha önce yanlış yaptığı/kaydettiği şu konulardan tamamen yeni, güncel TUS formatında, zorlu ve 5 seçenekli 1 vaka sorusu üretmek:
+        ${chosenContext}
+
+        Lütfen cevabı sadece ve sadece şu JSON yapısında dön (markdown veya ekstra yazı olmasın):
+        {
+          "topic": "SORU HANGİ KONUDAN (Örn: Dahiliye > Hematoloji)",
+          "question": "Çoktan seçmeli TUS vaka sorusu paragrafı",
+          "options": {
+            "A": "A seçeneği",
+            "B": "B seçeneği",
+            "C": "C seçeneği",
+            "D": "D seçeneği",
+            "E": "E seçeneği"
+          },
+          "answer": "DOĞRU SEÇENEK HARFİ (Örn: B)",
+          "explanation": "Detaylı ve öğretici patofizyolojik çözüm açıklaması"
+        }
+      `;
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: prompt, model: currentModel })
+        });
+
+        const data = await response.json();
+        let aiResultText = data.candidates[0].content.parts[0].text;
+        aiResultText = aiResultText.replace(/```json/g, "").replace(/```/g, "").trim();
+        
+        const quiz = JSON.parse(aiResultText);
+
+        document.getElementById("quizSubBadge").textContent = quiz.topic;
+        document.getElementById("quizQuestion").textContent = quiz.question;
+
+        const optionsHtml = Object.entries(quiz.options).map(([key, val]) => `
+          <button onclick="checkQuizAnswer('${key}', '${quiz.answer}', '${quiz.explanation.replace(/'/g, "\\'")}')" class="w-full text-left bg-slate-950 border border-slate-800 p-3.5 rounded-xl text-xs hover:bg-slate-800 active:scale-98 transition flex items-center gap-3">
+            <span class="w-6 h-6 rounded-lg bg-indigo-950 border border-indigo-800 flex items-center justify-center font-bold text-indigo-400 shrink-0">${key}</span>
+            <span class="text-slate-200">${val}</span>
+          </button>
+        `).join('');
+
+        document.getElementById("quizOptions").innerHTML = optionsHtml;
+
+      } catch (err) {
+        console.error("Quiz üretme hatası:", err);
+        document.getElementById("quizQuestion").textContent = "Soru üretilirken hata oluştu. Lütfen tekrar deneyin.";
+      }
+    };
+
+    window.checkQuizAnswer = (selected, correct, explanation) => {
+      const isCorrect = selected === correct;
+      const resDiv = document.getElementById("quizResult");
+      const resTitle = document.getElementById("quizResultTitle");
+      const resExp = document.getElementById("quizExplanation");
+
+      resDiv.className = isCorrect 
+        ? "p-4 rounded-2xl border bg-emerald-950/30 border-emerald-800/60 text-emerald-400 space-y-1.5"
+        : "p-4 rounded-2xl border bg-rose-950/30 border-rose-900/60 text-rose-400 space-y-1.5";
+
+      resTitle.innerHTML = isCorrect 
+        ? `<i class="fa-solid fa-circle-check"></i> DOĞRU CEVAP (${correct})` 
+        : `<i class="fa-solid fa-circle-xmark"></i> YANLIŞ CEVAP! (Doğru Cevap: ${correct})`;
+
+      resExp.textContent = explanation;
+      resDiv.classList.remove("hidden");
+    };
+
+  </script>
+</body>
+</html>

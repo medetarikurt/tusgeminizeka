@@ -252,16 +252,12 @@
     let activeQuizQuestion = null;
     let currentQuizData = null;
 
-    // 1. SABİT KOLEKSİYON + ESKİ KAYIT KURTARICI
-    // Tarayıcı değişse bile verilerin asla kaybolmaması için sabit ortak koleksiyon ("tus_archive") kullanıyoruz
-    // ve daha önce rastgele UID altına kaydedilmiş "Favizm" vb. sorularını da otomatik bulup listeye dahil ediyoruz.
     signInAnonymously(auth).catch(err => console.error("Auth hatası:", err));
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         document.getElementById("authStatus").innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Aktif`;
         
-        // Bilinen tüm kullanıcı ID'lerini localStorage'da tut (eski soruları kaybetmemek için)
         let knownUids = JSON.parse(localStorage.getItem("tus_known_uids") || "[]");
         if (!knownUids.includes(user.uid)) {
           knownUids.push(user.uid);
@@ -273,7 +269,6 @@
       }
     });
 
-    // JSON Temizleyici (Gemini markdown veya ekstra metin dönerse sadece { ... } bloğunu cımbızla çeker)
     function extractCleanJSON(rawText) {
       const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
       const firstBrace = cleaned.indexOf("{");
@@ -284,7 +279,6 @@
       return JSON.parse(cleaned);
     }
 
-    // Sekme Değiştirme
     window.switchTab = (tab) => {
       document.getElementById("sectionAdd").classList.toggle("hidden", tab !== 'add');
       document.getElementById("sectionArchive").classList.toggle("hidden", tab !== 'archive');
@@ -298,7 +292,6 @@
       document.getElementById("tabQuizBtn").className = tab === 'quiz' ? activeClass : passiveClass;
     };
 
-    // Model Değiştirme
     window.setModel = (model) => {
       currentModel = model;
       const isPro = model.includes('pro');
@@ -310,7 +303,6 @@
         : "text-xs px-3 py-1.5 rounded-lg font-bold transition-all text-slate-400 hover:text-slate-200";
     };
 
-    // Fotoğraf Sıkıştırma ve Hazırlama
     window.handleImageSelect = (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -344,7 +336,6 @@
       document.getElementById("imagePreviewContainer").classList.add("hidden");
     };
 
-    // SORU ANALİZ ET & KAYDET
     window.analyzeAndSaveQuestion = async () => {
       const questionText = document.getElementById("questionInput").value.trim();
       if (!questionText && !selectedImageBase64) {
@@ -387,7 +378,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
 
         const parsed = extractCleanJSON(aiResultText);
 
-        // Hata mesajı kartı değilse Firestore'da sabit "tus_questions" koleksiyonuna kaydet
         if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI") {
           await addDoc(collection(db, "tus_questions"), {
             branch: parsed.branch || "Genel",
@@ -420,13 +410,11 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       }
     };
 
-    // ARŞİVİ YÜKLE (Hem yeni ortak havuzu hem de eski kayıtlardaki soruları toplar)
     window.loadUserQuestions = async () => {
       try {
         const items = [];
         const seenIds = new Set();
 
-        // 1. Yeni sabit koleksiyonu çek ("tus_questions")
         const mainSnap = await getDocs(collection(db, "tus_questions"));
         mainSnap.forEach((d) => {
           const data = d.data();
@@ -440,7 +428,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
           });
         });
 
-        // 2. Önceki oturumlardan kalan "users/{uid}/questions" altındaki eski soruları da kurtar
         const knownUids = JSON.parse(localStorage.getItem("tus_known_uids") || "[]");
         for (const uid of knownUids) {
           try {
@@ -448,7 +435,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
             oldSnap.forEach((d) => {
               if (!seenIds.has(d.id)) {
                 const data = d.data();
-                // Sistem hata mesajlarını arşive alma
                 if (data.branch !== "SİSTEM MESAJI" && data.branch !== "API HATASI") {
                   seenIds.add(d.id);
                   items.push({
@@ -461,10 +447,9 @@ Kullanıcı Notu / Soru Metni: ${questionText}
                 }
               }
             });
-          } catch (e) { /* Eski koleksiyon yoksa geç */ }
+          } catch (e) {}
         }
 
-        // En yeniden en eskiye sırala
         items.sort((a, b) => b.sortTime - a.sortTime);
         allQuestions = items;
 
@@ -476,7 +461,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       }
     };
 
-    // TEK TIKLA SORU SİLME
     window.deleteQuestion = async (docId, colPath) => {
       try {
         const pathParts = colPath.split("/");
@@ -498,7 +482,7 @@ Kullanıcı Notu / Soru Metni: ${questionText}
         selectedBranchFilter = "All";
       }
       container.innerHTML = branches.map(b => `
-        <button onclick="setFilter('${b.replace(/'/g, "\'")}')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition ${
+        <button onclick="setFilter('${b.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition ${
           selectedBranchFilter === b 
             ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/20" 
             : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
@@ -564,9 +548,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       `}).join('');
     }
 
-    // ==============================================
-    // AKILLI QUIZ & 2 KEZ BİLİNCE OTOMATİK SİLME
-    // ==============================================
     window.generateQuiz = async () => {
       if (allQuestions.length === 0) {
         alert("Test üretebilmek için arşivinizde en az 1 kayıtlı soru/spot bulunmalıdır.");
@@ -583,7 +564,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       document.getElementById("quizOptions").innerHTML = "";
       document.getElementById("quizResult").classList.add("hidden");
 
-      // Rastgele bir soru seç
       activeQuizQuestion = allQuestions[Math.floor(Math.random() * allQuestions.length)];
       document.getElementById("quizSubBadge").textContent = `${activeQuizQuestion.branch} • ${activeQuizQuestion.topic}`;
       document.getElementById("quizStreakBadge").textContent = `Mevcut Seri: ${activeQuizQuestion.correctStreak || 0}/2`;
@@ -647,7 +627,6 @@ Sadece aşağıdaki JSON formatında yanıt ver:
     async function handleQuizSelection(selectedKey, clickedBtn) {
       if (!currentQuizData || !activeQuizQuestion) return;
 
-      // Şıkları kilitle (tekrar tıklanmasın)
       const allBtns = document.querySelectorAll(".quiz-opt-btn");
       allBtns.forEach(b => b.disabled = true);
 
@@ -689,7 +668,7 @@ Sadece aşağıdaki JSON formatında yanıt ver:
 
       resDiv.className = isCorrect 
         ? "p-4 rounded-2xl border bg-emerald-950/30 border-emerald-800/60 text-emerald-400 space-y-2"
-        : "p-4 rounded-2xl border bg-rose-950/30 border-rose-800/60 text-rose-400 space-y-2";
+        : "p-4 rounded-2xl border bg-rose-950/30 border-rose-900/60 text-rose-400 space-y-2";
 
       resTitle.innerHTML = (isCorrect 
         ? `<div class="text-sm font-extrabold"><i class="fa-solid fa-circle-check mr-1"></i> DOĞRU CEVAP (${correctKey})</div>` 

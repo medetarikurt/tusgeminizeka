@@ -5,20 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TUS Asistanı</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Mobil iOS / PWA Ayarları -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#090d16">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3406/3406828.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
   <style>
-    body { 
-      -webkit-tap-highlight-color: transparent; 
-      background-color: #090d16;
-    }
+    body { -webkit-tap-highlight-color: transparent; background-color: #090d16; }
     .ios-scroll { -webkit-overflow-scrolling: touch; }
     .scrollbar-none::-webkit-scrollbar { display: none; }
     .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
@@ -26,7 +20,6 @@
 </head>
 <body class="text-slate-100 min-h-screen flex flex-col font-sans ios-scroll select-none">
 
-  <!-- ÜST BAR -->
   <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-50 px-4 py-3 flex justify-between items-center">
     <div class="flex items-center space-x-2.5">
       <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-extrabold text-white shadow-lg shadow-indigo-500/30">T</div>
@@ -40,7 +33,6 @@
     </div>
   </header>
 
-  <!-- SEKMELER -->
   <nav class="flex border-b border-slate-800/80 bg-slate-900/50 text-xs sm:text-sm sticky top-[57px] z-40 backdrop-blur-md">
     <button id="tabAddBtn" onclick="switchTab('add')" class="flex-1 py-3.5 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition-all">
       <i class="fa-solid fa-camera mr-1"></i> Soru Çek
@@ -49,37 +41,25 @@
       <i class="fa-solid fa-layer-group mr-1"></i> Arşivim (<span id="archiveCount">0</span>)
     </button>
     <button id="tabQuizBtn" onclick="switchTab('quiz')" class="flex-1 py-3.5 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all">
-      <i class="fa-solid fa-bolt mr-1"></i> Beni Test Et
+      <i class="fa-solid fa-bolt mr-1"></i> Test <span id="dueBadge" class="hidden ml-1 text-[10px] bg-rose-600 text-white rounded-full px-1.5 py-0.5">0</span>
     </button>
   </nav>
 
-  <!-- ANA İÇERİK -->
-  <main class="flex-1 p-4 max-w-xl mx-auto w-full pb-16">
-    
-    <!-- ============================================== -->
-    <!-- 1. SEKME: KAMERA & SORU EKLE                   -->
-    <!-- ============================================== -->
+  <main class="flex-1 p-4 max-w-xl mx-auto w-full pb-24">
+
+    <!-- 1. SEKME -->
     <section id="sectionAdd" class="space-y-4">
-      
-      <!-- MODEL SEÇİCİ -->
       <div class="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800">
         <span class="text-xs text-slate-400 font-semibold pl-1.5 flex items-center gap-1.5">
           <i class="fa-solid fa-microchip text-indigo-400"></i> Yapay Zeka Modu
         </span>
         <div class="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
-          <button id="modelFlash" onclick="setModel('gemini-3.8-flash')" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all bg-indigo-600 text-white shadow">
-            Flash (Hızlı)
-          </button>
-          <button id="modelPro" onclick="setModel('gemini-3.8-pro')" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all text-slate-400 hover:text-slate-200">
-            Pro (Derin Vaka)
-          </button>
+          <button id="modelFlash" onclick="setModel('gemini-3.8-flash')" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all bg-indigo-600 text-white shadow">Flash (Hızlı)</button>
+          <button id="modelPro" onclick="setModel('gemini-3.8-pro')" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all text-slate-400 hover:text-slate-200">Pro (Derin Vaka)</button>
         </div>
       </div>
 
-      <!-- DEV KAMERA / GALERİ KARTI -->
       <div class="bg-gradient-to-b from-indigo-950/25 to-slate-900/90 border-2 border-dashed border-indigo-500/40 rounded-3xl p-5 text-center space-y-4 shadow-xl">
-        
-        <!-- Doğrudan Kamera Açan Ana Alan -->
         <label class="block cursor-pointer active:scale-[0.98] transition-transform">
           <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelect(event)">
           <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30 mb-3">
@@ -88,8 +68,6 @@
           <h3 class="text-lg font-extrabold tracking-tight text-indigo-200">Sorunun Fotoğrafını Çek</h3>
           <p class="text-xs text-slate-400 mt-0.5">Kitaptan veya denemeden doğrudan çekmek için dokun</p>
         </label>
-
-        <!-- Galeriden Seçme Alternatifi -->
         <div class="pt-2 border-t border-slate-800/80 flex justify-center">
           <label class="cursor-pointer inline-flex items-center gap-1.5 text-xs font-bold text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 px-4 py-2 rounded-xl border border-indigo-800/50 transition active:scale-95">
             <i class="fa-regular fa-images"></i>
@@ -99,117 +77,93 @@
         </div>
       </div>
 
-      <!-- GÖRSEL ÖNİZLEME -->
       <div id="imagePreviewContainer" class="hidden relative rounded-2xl overflow-hidden border border-indigo-500/40 bg-slate-900 shadow-xl">
         <img id="imagePreview" class="w-full max-h-[260px] object-contain bg-slate-950" />
         <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent flex items-center justify-between p-3">
-          <span class="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow">
-            <i class="fa-solid fa-check"></i> Görsel Hazır
-          </span>
-          <button onclick="clearImage()" class="bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition">
-            <i class="fa-solid fa-trash-can"></i> Kaldır
-          </button>
+          <span class="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow"><i class="fa-solid fa-check"></i> Görsel Hazır</span>
+          <button onclick="clearImage()" class="bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition"><i class="fa-solid fa-trash-can"></i> Kaldır</button>
         </div>
       </div>
 
-      <!-- METİN GİRİŞİ VE GÖNDER BUTONU -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
         <label class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
           <i class="fa-solid fa-pen-nib text-indigo-400"></i> Metin veya Ek Soru Notu
         </label>
         <textarea id="questionInput" rows="3" placeholder="Soruyu doğrudan buraya yazabilir ya da çektiğin fotoğrafın üzerine 'C şıkkını anlamadım' gibi not düşebilirsin..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition resize-none select-text"></textarea>
-
         <button id="analyzeBtn" onclick="analyzeAndSaveQuestion()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition active:scale-[0.98]">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
           <span>Analiz Et & Arşive Kaydet</span>
         </button>
       </div>
 
-      <!-- ÇÖZÜM SONUÇ KARTI -->
       <div id="resultCard" class="hidden bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <div class="flex items-center gap-2 flex-wrap">
             <span id="resBadge" class="text-xs px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-700/60 text-indigo-300 font-extrabold">BRANŞ</span>
             <span id="resSubBadge" class="text-xs font-bold text-slate-300">Konu</span>
           </div>
-          <span class="text-[11px] text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800/50 font-bold shrink-0">
+          <span id="resSaved" class="text-[11px] text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800/50 font-bold shrink-0">
             <i class="fa-solid fa-check mr-1"></i> Kaydedildi
           </span>
         </div>
-
         <div class="space-y-1.5">
-          <h3 class="text-xs font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <i class="fa-solid fa-bolt"></i> Akılda Kalıcı Spot (Key Takeaway)
-          </h3>
+          <h3 class="text-xs font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-bolt"></i> Akılda Kalıcı Spot (Key Takeaway)</h3>
           <p id="resKeyTakeaway" class="text-sm font-bold text-emerald-300 bg-emerald-950/30 border border-emerald-800/50 p-3 rounded-xl leading-snug select-text"></p>
         </div>
-
         <div class="space-y-1.5">
-          <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-            <i class="fa-solid fa-stethoscope"></i> Detaylı Patofizyoloji & Çözüm
-          </h3>
+          <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-stethoscope"></i> Detaylı Patofizyoloji & Çözüm</h3>
           <div id="resExplanation" class="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-950 p-3.5 rounded-xl border border-slate-800/80 max-h-[380px] overflow-y-auto select-text"></div>
         </div>
       </div>
     </section>
 
-    <!-- ============================================== -->
-    <!-- 2. SEKME: ARŞİV / HATALAR                      -->
-    <!-- ============================================== -->
+    <!-- 2. SEKME -->
     <section id="sectionArchive" class="hidden space-y-4">
       <div class="flex items-center justify-between bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
         <div>
           <h2 class="text-sm font-extrabold text-white">Kişisel Hata & Spot Arşivin</h2>
-          <p class="text-[11px] text-slate-400">Testlerde 2 kez üst üste bildiğin spotlar otomatik silinir</p>
+          <p class="text-[11px] text-slate-400">Aralıklı tekrar: 1 → 3 → 7 → 21 gün, sonra "öğrenildi"</p>
         </div>
         <button onclick="loadUserQuestions()" class="text-xs bg-slate-800 hover:bg-slate-700 text-indigo-300 px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition active:scale-95">
           <i class="fa-solid fa-rotate-right"></i> Yenile
         </button>
       </div>
 
-      <!-- Branş Filtreleri -->
-      <div id="branchFilters" class="flex gap-2 overflow-x-auto pb-1 scrollbar-none"></div>
+      <div class="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+        <button id="statusActive" onclick="setStatus('active')" class="flex-1 text-xs px-3 py-2 rounded-lg font-bold transition-all bg-indigo-600 text-white">Çalışılacaklar (<span id="cntActive">0</span>)</button>
+        <button id="statusLearned" onclick="setStatus('learned')" class="flex-1 text-xs px-3 py-2 rounded-lg font-bold transition-all text-slate-400">Öğrenilenler (<span id="cntLearned">0</span>)</button>
+      </div>
 
-      <!-- Soru Listesi -->
+      <div id="branchFilters" class="flex gap-2 overflow-x-auto pb-1 scrollbar-none"></div>
       <div id="questionsList" class="space-y-3">
         <div class="text-center py-12 text-slate-500 text-sm">Yükleniyor...</div>
       </div>
     </section>
 
-    <!-- ============================================== -->
-    <!-- 3. SEKME: BENİ TEST ET (AKILLI QUIZ)           -->
-    <!-- ============================================== -->
+    <!-- 3. SEKME -->
     <section id="sectionQuiz" class="hidden space-y-4">
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3 text-center">
         <div class="flex items-center justify-between text-left">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-700/50 flex items-center justify-center text-indigo-400 shrink-0">
-              <i class="fa-solid fa-dumbbell text-lg"></i>
-            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-700/50 flex items-center justify-center text-indigo-400 shrink-0"><i class="fa-solid fa-dumbbell text-lg"></i></div>
             <div>
               <h2 class="text-sm font-extrabold text-white">Akıllı Tekrar & Vaka Testi</h2>
-              <p class="text-[11px] text-slate-400">Arşivindeki spotlardan 5 şıklı yeni TUS sorusu üretir</p>
+              <p class="text-[11px] text-slate-400">Önce vadesi gelen spotlar sorulur. Bugün vadesi gelen: <b id="dueCount" class="text-amber-300">0</b></p>
             </div>
           </div>
         </div>
         <button id="newQuizBtn" onclick="generateQuiz()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold py-3 rounded-xl shadow-lg transition active:scale-98 flex items-center justify-center gap-2">
-          <i class="fa-solid fa-play"></i>
-          <span>Arşivimden Yeni Soru Çek</span>
+          <i class="fa-solid fa-play"></i><span>Sıradaki Tekrar Sorusu</span>
         </button>
       </div>
 
-      <!-- QUIZ KARTI -->
       <div id="quizContainer" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
           <span id="quizSubBadge" class="text-xs font-extrabold text-indigo-300 bg-indigo-950/80 px-2.5 py-1 rounded-lg border border-indigo-800/50">Konu</span>
-          <span id="quizStreakBadge" class="text-[11px] font-bold text-slate-400">Seri: 0/2</span>
+          <span id="quizStreakBadge" class="text-[11px] font-bold text-slate-400">Seviye: 0/5</span>
         </div>
-
         <p id="quizQuestion" class="text-sm font-medium text-slate-100 leading-relaxed select-text"></p>
-        
         <div id="quizOptions" class="space-y-2.5 pt-1"></div>
-
-        <!-- Quiz Sonuç Bildirimi -->
         <div id="quizResult" class="hidden p-4 rounded-xl space-y-2 border">
           <div id="quizResultTitle" class="text-xs font-extrabold"></div>
           <p id="quizExplanation" class="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap select-text"></p>
@@ -219,14 +173,18 @@
         </div>
       </div>
     </section>
-
   </main>
 
-  <!-- FIREBASE & UYGULAMA MANTIĞI -->
+  <!-- TOAST (geri al) -->
+  <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-800 border border-slate-600 text-slate-100 text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl items-center gap-3">
+    <span id="toastText"></span>
+    <button id="toastUndo" class="text-indigo-300 underline">Geri Al</button>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAS-Xf6I1xDlep59iZAphe-PzJFzddS-N8",
@@ -237,70 +195,107 @@
       appId: "1:686279505904:web:c6ecfb760106e4476ccf35",
       measurementId: "G-9SC3CQ1771"
     };
-
     const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
+    const COL = "tus_questions";                 // Tüm cihazlar için ortak tek koleksiyon
+    const INTERVAL_DAYS = [1, 3, 7, 21];         // Seviye 1..4 sonrası bekleme; 5. doğru = öğrenildi
+    const DAY = 86400000;
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let selectedImageBase64 = null;
-    let selectedImageMime = null;
+    let selectedImageBase64 = null, selectedImageMime = null;
     let currentModel = "gemini-3.8-flash";
     let allQuestions = [];
     let selectedBranchFilter = "All";
-    let activeQuizQuestion = null;
-    let currentQuizData = null;
+    let selectedStatus = "active";
+    let activeQuizQuestion = null, currentQuizData = null;
+
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const $ = id => document.getElementById(id);
 
     signInAnonymously(auth).catch(err => console.error("Auth hatası:", err));
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        document.getElementById("authStatus").innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Aktif`;
-        
+        $("authStatus").innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Aktif`;
         let knownUids = JSON.parse(localStorage.getItem("tus_known_uids") || "[]");
         if (!knownUids.includes(user.uid)) {
           knownUids.push(user.uid);
           localStorage.setItem("tus_known_uids", JSON.stringify(knownUids));
         }
+        await migrateOldData(knownUids);
         await loadUserQuestions();
       } else {
-        document.getElementById("authStatus").innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Bağlantı Yok`;
+        $("authStatus").innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Bağlantı Yok`;
       }
     });
 
+    // Eski users/{uid}/questions kayıtlarını ortak koleksiyona taşır
+    async function migrateOldData(uids) {
+      for (const uid of uids) {
+        try {
+          const snap = await getDocs(collection(db, "users", uid, "questions"));
+          for (const d of snap.docs) {
+            const data = d.data();
+            if (data.branch !== "SİSTEM MESAJI" && data.branch !== "API HATASI") {
+              await setDoc(doc(db, COL, d.id), data);
+            }
+            await deleteDoc(d.ref);
+          }
+        } catch (e) { /* koleksiyon yoksa veya yetki yoksa geç */ }
+      }
+    }
+
     function extractCleanJSON(rawText) {
       const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
-      const firstBrace = cleaned.indexOf("{");
-      const lastBrace = cleaned.lastIndexOf("}");
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
-      }
+      const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+      if (a !== -1 && b !== -1) return JSON.parse(cleaned.substring(a, b + 1));
       return JSON.parse(cleaned);
     }
 
+    async function callWorker(body) {
+      const response = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        throw new Error(response.status === 429 ? "Ücretsiz kota doldu, biraz sonra tekrar dene." : "Sunucu hatası (" + response.status + ")");
+      }
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("Yapay zeka yanıtı alınamadı.");
+      return text;
+    }
+
+    function showToast(text, onUndo) {
+      const t = $("toast");
+      $("toastText").textContent = text;
+      t.classList.remove("hidden"); t.classList.add("flex");
+      clearTimeout(showToast.timer);
+      $("toastUndo").onclick = async () => { t.classList.add("hidden"); t.classList.remove("flex"); await onUndo(); };
+      showToast.timer = setTimeout(() => { t.classList.add("hidden"); t.classList.remove("flex"); }, 7000);
+    }
+
     window.switchTab = (tab) => {
-      document.getElementById("sectionAdd").classList.toggle("hidden", tab !== 'add');
-      document.getElementById("sectionArchive").classList.toggle("hidden", tab !== 'archive');
-      document.getElementById("sectionQuiz").classList.toggle("hidden", tab !== 'quiz');
-
-      const activeClass = "flex-1 py-3.5 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition-all";
-      const passiveClass = "flex-1 py-3.5 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all";
-
-      document.getElementById("tabAddBtn").className = tab === 'add' ? activeClass : passiveClass;
-      document.getElementById("tabArchiveBtn").className = tab === 'archive' ? activeClass : passiveClass;
-      document.getElementById("tabQuizBtn").className = tab === 'quiz' ? activeClass : passiveClass;
+      $("sectionAdd").classList.toggle("hidden", tab !== 'add');
+      $("sectionArchive").classList.toggle("hidden", tab !== 'archive');
+      $("sectionQuiz").classList.toggle("hidden", tab !== 'quiz');
+      const on = "flex-1 py-3.5 text-center font-bold border-b-2 border-indigo-500 text-indigo-400 transition-all";
+      const off = "flex-1 py-3.5 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all";
+      $("tabAddBtn").className = tab === 'add' ? on : off;
+      $("tabArchiveBtn").className = tab === 'archive' ? on : off;
+      $("tabQuizBtn").className = tab === 'quiz' ? on : off;
     };
 
     window.setModel = (model) => {
       currentModel = model;
       const isPro = model.includes('pro');
-      document.getElementById("modelFlash").className = !isPro 
-        ? "text-xs px-3 py-1.5 rounded-lg font-bold transition-all bg-indigo-600 text-white shadow" 
-        : "text-xs px-3 py-1.5 rounded-lg font-bold transition-all text-slate-400 hover:text-slate-200";
-      document.getElementById("modelPro").className = isPro 
-        ? "text-xs px-3 py-1.5 rounded-lg font-bold transition-all bg-indigo-600 text-white shadow" 
-        : "text-xs px-3 py-1.5 rounded-lg font-bold transition-all text-slate-400 hover:text-slate-200";
+      const on = "text-xs px-3 py-1.5 rounded-lg font-bold transition-all bg-indigo-600 text-white shadow";
+      const off = "text-xs px-3 py-1.5 rounded-lg font-bold transition-all text-slate-400 hover:text-slate-200";
+      $("modelFlash").className = !isPro ? on : off;
+      $("modelPro").className = isPro ? on : off;
     };
 
     window.handleImageSelect = (event) => {
@@ -312,16 +307,16 @@
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const max_size = 1280;
-          let width = img.width, height = img.height;
-          if (width > height) { if (width > max_size) { height *= max_size / width; width = max_size; } }
-          else { if (height > max_size) { width *= max_size / height; height = max_size; } }
-          canvas.width = width; canvas.height = height;
-          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          const max = 1280;
+          let w = img.width, h = img.height;
+          if (w > h) { if (w > max) { h *= max / w; w = max; } }
+          else { if (h > max) { w *= max / h; h = max; } }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
           const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
           selectedImageBase64 = dataUrl.split(",")[1];
-          document.getElementById("imagePreview").src = dataUrl;
-          document.getElementById("imagePreviewContainer").classList.remove("hidden");
+          $("imagePreview").src = dataUrl;
+          $("imagePreviewContainer").classList.remove("hidden");
         };
         img.src = e.target.result;
       };
@@ -329,21 +324,35 @@
     };
 
     window.clearImage = () => {
-      selectedImageBase64 = null;
-      selectedImageMime = null;
-      document.getElementById("cameraInput").value = "";
-      document.getElementById("galleryInput").value = "";
-      document.getElementById("imagePreviewContainer").classList.add("hidden");
+      selectedImageBase64 = null; selectedImageMime = null;
+      $("cameraInput").value = ""; $("galleryInput").value = "";
+      $("imagePreviewContainer").classList.add("hidden");
     };
 
+    // ---------- Benzer spot kontrolü ----------
+    const words = s => new Set(String(s || "").toLowerCase().replace(/[^a-z0-9çğıöşüâî\s]/gi, " ").split(/\s+/).filter(w => w.length > 2));
+    function similarity(a, b) {
+      const A = words(a), B = words(b);
+      if (!A.size || !B.size) return 0;
+      let inter = 0; A.forEach(w => { if (B.has(w)) inter++; });
+      return inter / (A.size + B.size - inter);
+    }
+    function findDuplicate(p) {
+      const sub = (p.subTopic || "").trim().toLowerCase();
+      return allQuestions.find(q =>
+        (sub && (q.subTopic || "").trim().toLowerCase() === sub && q.branch === p.branch) ||
+        similarity(q.keyTakeaway, p.keyTakeaway) >= 0.55
+      );
+    }
+
+    // ---------- Analiz & kaydet ----------
     window.analyzeAndSaveQuestion = async () => {
-      const questionText = document.getElementById("questionInput").value.trim();
+      const questionText = $("questionInput").value.trim();
       if (!questionText && !selectedImageBase64) {
         alert("Lütfen önce sorunun fotoğrafını çekin veya metin kutusuna yazın.");
         return;
       }
-
-      const btn = document.getElementById("analyzeBtn");
+      const btn = $("analyzeBtn");
       btn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> <span>Yapay Zeka Çözüyor...</span>`;
 
@@ -361,46 +370,49 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       `;
 
       try {
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt,
-            model: currentModel,
-            imageBase64: selectedImageBase64,
-            mimeType: selectedImageMime
-          })
-        });
-
-        const data = await response.json();
-        const aiResultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!aiResultText) throw new Error("Yapay zeka yanıtı alınamadı.");
-
-        const parsed = extractCleanJSON(aiResultText);
+        const text = await callWorker({ prompt, model: currentModel, imageBase64: selectedImageBase64, mimeType: selectedImageMime });
+        const parsed = extractCleanJSON(text);
+        let saved = false;
 
         if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI") {
-          await addDoc(collection(db, "tus_questions"), {
-            branch: parsed.branch || "Genel",
-            topic: parsed.topic || "Genel",
-            subTopic: parsed.subTopic || "",
-            rawQuestion: questionText || "📷 Fotoğraflı TUS Sorusu",
-            aiExplanation: parsed.explanation || "",
-            keyTakeaway: parsed.keyTakeaway || "",
-            correctStreak: 0,
-            createdAtMs: Date.now()
-          });
+          const dup = findDuplicate(parsed);
+          let doSave = true;
+          if (dup) {
+            doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
+          }
+          if (doSave) {
+            await addDoc(collection(db, COL), {
+              branch: parsed.branch || "Genel",
+              topic: parsed.topic || "Genel",
+              subTopic: parsed.subTopic || "",
+              rawQuestion: questionText || "📷 Fotoğraflı TUS Sorusu",
+              aiExplanation: parsed.explanation || "",
+              keyTakeaway: parsed.keyTakeaway || "",
+              box: 0,
+              nextReview: Date.now(),
+              learned: false,
+              deleted: false,
+              createdAtMs: Date.now()
+            });
+            saved = true;
+          }
         }
 
-        document.getElementById("resBadge").textContent = (parsed.branch || "GENEL").toUpperCase();
-        document.getElementById("resSubBadge").textContent = (parsed.topic || "") + (parsed.subTopic ? ` • ${parsed.subTopic}` : "");
-        document.getElementById("resKeyTakeaway").textContent = parsed.keyTakeaway || "";
-        document.getElementById("resExplanation").textContent = parsed.explanation || "";
-        document.getElementById("resultCard").classList.remove("hidden");
+        $("resSaved").innerHTML = saved
+          ? `<i class="fa-solid fa-check mr-1"></i> Kaydedildi`
+          : `<i class="fa-solid fa-ban mr-1"></i> Kaydedilmedi`;
+        $("resSaved").className = saved
+          ? "text-[11px] text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800/50 font-bold shrink-0"
+          : "text-[11px] text-amber-300 bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-800/50 font-bold shrink-0";
+        $("resBadge").textContent = (parsed.branch || "GENEL").toUpperCase();
+        $("resSubBadge").textContent = (parsed.topic || "") + (parsed.subTopic ? ` • ${parsed.subTopic}` : "");
+        $("resKeyTakeaway").textContent = parsed.keyTakeaway || "";
+        $("resExplanation").textContent = parsed.explanation || "";
+        $("resultCard").classList.remove("hidden");
 
-        document.getElementById("questionInput").value = "";
+        $("questionInput").value = "";
         clearImage();
         await loadUserQuestions();
-
       } catch (err) {
         console.error("Analiz hatası:", err);
         alert("Çözüm sırasında bir hata oluştu: " + err.message);
@@ -410,163 +422,174 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       }
     };
 
+    // ---------- Yükleme ----------
     window.loadUserQuestions = async () => {
       try {
+        const snap = await getDocs(collection(db, COL));
         const items = [];
-        const seenIds = new Set();
-
-        const mainSnap = await getDocs(collection(db, "tus_questions"));
-        mainSnap.forEach((d) => {
+        snap.forEach(d => {
           const data = d.data();
-          seenIds.add(d.id);
+          if (data.deleted === true) return;
+          if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI") return;
           items.push({
             id: d.id,
-            colPath: "tus_questions",
             ...data,
-            correctStreak: typeof data.correctStreak === "number" ? data.correctStreak : 0,
+            box: typeof data.box === "number" ? data.box : 0,
+            nextReview: typeof data.nextReview === "number" ? data.nextReview : 0,
+            learned: data.learned === true,
             sortTime: data.createdAtMs || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0)
           });
         });
-
-        const knownUids = JSON.parse(localStorage.getItem("tus_known_uids") || "[]");
-        for (const uid of knownUids) {
-          try {
-            const oldSnap = await getDocs(collection(db, "users", uid, "questions"));
-            oldSnap.forEach((d) => {
-              if (!seenIds.has(d.id)) {
-                const data = d.data();
-                if (data.branch !== "SİSTEM MESAJI" && data.branch !== "API HATASI") {
-                  seenIds.add(d.id);
-                  items.push({
-                    id: d.id,
-                    colPath: `users/${uid}/questions`,
-                    ...data,
-                    correctStreak: typeof data.correctStreak === "number" ? data.correctStreak : 0,
-                    sortTime: data.createdAtMs || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0)
-                  });
-                }
-              }
-            });
-          } catch (e) {}
-        }
-
         items.sort((a, b) => b.sortTime - a.sortTime);
         allQuestions = items;
-
-        document.getElementById("archiveCount").textContent = allQuestions.length;
-        renderFilters();
-        renderQuestions();
+        refreshAll();
       } catch (err) {
         console.error("Arşiv yükleme hatası:", err);
       }
     };
 
-    window.deleteQuestion = async (docId, colPath) => {
+    function refreshAll() {
+      const active = allQuestions.filter(q => !q.learned);
+      const now = Date.now();
+      const due = active.filter(q => q.nextReview <= now).length;
+      $("archiveCount").textContent = active.length;
+      $("cntActive").textContent = active.length;
+      $("cntLearned").textContent = allQuestions.length - active.length;
+      $("dueCount").textContent = due;
+      $("dueBadge").textContent = due;
+      $("dueBadge").classList.toggle("hidden", due === 0);
+      renderFilters();
+      renderQuestions();
+    }
+
+    window.setStatus = (s) => {
+      selectedStatus = s;
+      const on = "flex-1 text-xs px-3 py-2 rounded-lg font-bold transition-all bg-indigo-600 text-white";
+      const off = "flex-1 text-xs px-3 py-2 rounded-lg font-bold transition-all text-slate-400";
+      $("statusActive").className = s === 'active' ? on : off;
+      $("statusLearned").className = s === 'learned' ? on : off;
+      selectedBranchFilter = "All";
+      renderFilters(); renderQuestions();
+    };
+
+    const inStatus = () => allQuestions.filter(q => selectedStatus === 'learned' ? q.learned : !q.learned);
+
+    // ---------- Silme (onay + geri al) ----------
+    window.deleteQuestion = async (docId) => {
+      const q = allQuestions.find(x => x.id === docId);
+      if (!q) return;
+      if (!confirm(`"${q.subTopic || q.topic || 'Bu spot'}" silinsin mi?`)) return;
       try {
-        const pathParts = colPath.split("/");
-        await deleteDoc(doc(db, ...pathParts, docId));
-        allQuestions = allQuestions.filter(q => q.id !== docId);
-        document.getElementById("archiveCount").textContent = allQuestions.length;
-        renderFilters();
-        renderQuestions();
+        await updateDoc(doc(db, COL, docId), { deleted: true });
+        allQuestions = allQuestions.filter(x => x.id !== docId);
+        refreshAll();
+        showToast("Spot silindi", async () => {
+          await updateDoc(doc(db, COL, docId), { deleted: false });
+          await loadUserQuestions();
+        });
       } catch (err) {
         console.error("Silme hatası:", err);
         alert("Silinirken hata oluştu.");
       }
     };
 
-    function renderFilters() {
-      const container = document.getElementById("branchFilters");
-      const branches = ["All", ...new Set(allQuestions.map(q => q.branch).filter(Boolean))];
-      if (selectedBranchFilter !== "All" && !branches.includes(selectedBranchFilter)) {
-        selectedBranchFilter = "All";
-      }
-      container.innerHTML = branches.map(b => `
-        <button onclick="setFilter('${b.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition ${
-          selectedBranchFilter === b 
-            ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/20" 
-            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
-        }">${b === 'All' ? 'Tümü (' + allQuestions.length + ')' : b}</button>
-      `).join('');
-    }
-
-    window.setFilter = (branch) => {
-      selectedBranchFilter = branch;
-      renderFilters();
-      renderQuestions();
+    window.reactivateQuestion = async (docId) => {
+      await updateDoc(doc(db, COL, docId), { learned: false, box: 0, nextReview: Date.now() });
+      await loadUserQuestions();
     };
 
+    function renderFilters() {
+      const list = inStatus();
+      const branches = ["All", ...new Set(list.map(q => q.branch).filter(Boolean))];
+      if (selectedBranchFilter !== "All" && !branches.includes(selectedBranchFilter)) selectedBranchFilter = "All";
+      $("branchFilters").innerHTML = branches.map(b => `
+        <button data-b="${esc(b)}" onclick="setFilter(this.dataset.b)" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition ${
+          selectedBranchFilter === b ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/20" : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+        }">${b === 'All' ? 'Tümü (' + list.length + ')' : esc(b)}</button>`).join('');
+    }
+
+    window.setFilter = (branch) => { selectedBranchFilter = branch; renderFilters(); renderQuestions(); };
+
+    function reviewLabel(q) {
+      if (q.learned) return "✅ Öğrenildi";
+      const diff = q.nextReview - Date.now();
+      if (diff <= 0) return "🔔 Tekrar zamanı";
+      const d = Math.ceil(diff / DAY);
+      return `⏳ ${d} gün sonra`;
+    }
+
     function renderQuestions() {
-      const container = document.getElementById("questionsList");
-      const filtered = selectedBranchFilter === "All" 
-        ? allQuestions 
-        : allQuestions.filter(q => q.branch === selectedBranchFilter);
+      const container = $("questionsList");
+      const base = inStatus();
+      const filtered = selectedBranchFilter === "All" ? base : base.filter(q => q.branch === selectedBranchFilter);
 
       if (filtered.length === 0) {
         container.innerHTML = `
           <div class="text-center py-12 bg-slate-900/40 rounded-2xl border border-slate-800/60 space-y-2">
             <i class="fa-solid fa-folder-open text-2xl text-slate-600"></i>
-            <p class="text-slate-400 text-xs font-medium">Arşivde henüz kayıtlı spot bulunmuyor.</p>
+            <p class="text-slate-400 text-xs font-medium">${selectedStatus === 'learned' ? 'Henüz öğrenilmiş spot yok.' : 'Arşivde henüz kayıtlı spot bulunmuyor.'}</p>
           </div>`;
         return;
       }
 
-      container.innerHTML = filtered.map(q => {
-        const streak = q.correctStreak || 0;
-        return `
+      container.innerHTML = filtered.map(q => `
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
           <div class="flex items-start justify-between gap-2">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-700/60 text-indigo-300 font-extrabold uppercase">${q.branch || 'GENEL'}</span>
-              <span class="text-xs font-bold text-slate-300">${q.topic || ''} ${q.subTopic ? '• ' + q.subTopic : ''}</span>
+              <span class="text-[10px] px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-700/60 text-indigo-300 font-extrabold uppercase">${esc(q.branch || 'GENEL')}</span>
+              <span class="text-xs font-bold text-slate-300">${esc(q.topic || '')} ${q.subTopic ? '• ' + esc(q.subTopic) : ''}</span>
             </div>
-            <button onclick="deleteQuestion('${q.id}', '${q.colPath}')" class="text-xs bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/50 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shrink-0 transition active:scale-95">
-              <i class="fa-solid fa-trash-can"></i> Sil
-            </button>
+            <div class="flex gap-1.5 shrink-0">
+              ${q.learned ? `<button onclick="reactivateQuestion('${esc(q.id)}')" class="text-xs bg-indigo-950/60 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/50 px-2.5 py-1 rounded-lg font-bold transition active:scale-95"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
+              <button onclick="deleteQuestion('${esc(q.id)}')" class="text-xs bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/50 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition active:scale-95"><i class="fa-solid fa-trash-can"></i> Sil</button>
+            </div>
           </div>
-
           <div class="bg-emerald-950/25 border border-emerald-800/40 p-3 rounded-xl space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">
-                <i class="fa-solid fa-bolt mr-1"></i> Spot Bilgi
-              </span>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">
-                Doğru Serisi: ${streak}/2
-              </span>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider"><i class="fa-solid fa-bolt mr-1"></i> Spot Bilgi</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">Seviye ${q.box}/5 • ${reviewLabel(q)}</span>
             </div>
-            <p class="text-xs font-bold text-emerald-200 leading-relaxed select-text">${q.keyTakeaway || ''}</p>
+            <p class="text-xs font-bold text-emerald-200 leading-relaxed select-text">${esc(q.keyTakeaway)}</p>
           </div>
-
           <details class="text-xs text-slate-300 group">
             <summary class="cursor-pointer hover:text-indigo-300 font-bold py-1 select-none flex items-center gap-1.5 text-slate-400">
               <i class="fa-solid fa-chevron-right text-[10px] group-open:rotate-90 transition-transform"></i>
               <span>Detaylı Patofizyoloji & Çözümü Gör</span>
             </summary>
-            <div class="mt-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800/80 leading-relaxed whitespace-pre-wrap text-slate-200 select-text">${q.aiExplanation || ''}</div>
+            <div class="mt-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800/80 leading-relaxed whitespace-pre-wrap text-slate-200 select-text">${esc(q.aiExplanation)}</div>
           </details>
-        </div>
-      `}).join('');
+        </div>`).join('');
+    }
+
+    // ---------- Quiz (aralıklı tekrar) ----------
+    function pickNextQuestion() {
+      const now = Date.now();
+      const active = allQuestions.filter(q => !q.learned);
+      if (active.length === 0) { alert("Test üretebilmek için arşivinde çalışılacak en az 1 spot olmalı."); return null; }
+      let pool = active.filter(q => q.nextReview <= now).sort((a, b) => a.nextReview - b.nextReview);
+      if (pool.length === 0) {
+        if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
+        pool = [...active].sort((a, b) => a.nextReview - b.nextReview);
+      }
+      // En vadesi geçmiş 5 spot arasından rastgele (hep aynı sırayla gelmesin)
+      return pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
     }
 
     window.generateQuiz = async () => {
-      if (allQuestions.length === 0) {
-        alert("Test üretebilmek için arşivinizde en az 1 kayıtlı soru/spot bulunmalıdır.");
-        return;
-      }
+      const picked = pickNextQuestion();
+      if (!picked) return;
+      activeQuizQuestion = picked;
 
-      const btn = document.getElementById("newQuizBtn");
+      const btn = $("newQuizBtn");
       btn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> <span>Soru Hazırlanıyor...</span>`;
 
-      const container = document.getElementById("quizContainer");
-      container.classList.remove("hidden");
-      document.getElementById("quizQuestion").textContent = "Arşivindeki spot bilgiden yeni bir TUS vaka sorusu kurgulanıyor...";
-      document.getElementById("quizOptions").innerHTML = "";
-      document.getElementById("quizResult").classList.add("hidden");
-
-      activeQuizQuestion = allQuestions[Math.floor(Math.random() * allQuestions.length)];
-      document.getElementById("quizSubBadge").textContent = `${activeQuizQuestion.branch} • ${activeQuizQuestion.topic}`;
-      document.getElementById("quizStreakBadge").textContent = `Mevcut Seri: ${activeQuizQuestion.correctStreak || 0}/2`;
+      $("quizContainer").classList.remove("hidden");
+      $("quizQuestion").textContent = "Spot bilgiden yeni bir TUS vaka sorusu kurgulanıyor...";
+      $("quizOptions").innerHTML = "";
+      $("quizResult").classList.add("hidden");
+      $("quizSubBadge").textContent = `${activeQuizQuestion.branch} • ${activeQuizQuestion.topic}`;
+      $("quizStreakBadge").textContent = `Seviye: ${activeQuizQuestion.box}/5`;
 
       const prompt = `
 Sen bir TUS soru yazarısın. Kullanıcının daha önce takıldığı şu spot bilgiyi ölçen, orijinal TUS formatında, 5 şıklı (A, B, C, D, E) klinik bir vaka sorusu yaz:
@@ -577,104 +600,78 @@ Detay: ${activeQuizQuestion.aiExplanation}
 Sadece aşağıdaki JSON formatında yanıt ver:
 {
   "question": "Klinik vaka sorusu metni",
-  "options": {
-    "A": "A şıkkı",
-    "B": "B şıkkı",
-    "C": "C şıkkı",
-    "D": "D şıkkı",
-    "E": "E şıkkı"
-  },
+  "options": { "A": "A şıkkı", "B": "B şıkkı", "C": "C şıkkı", "D": "D şıkkı", "E": "E şıkkı" },
   "answer": "Doğru şık harfi (Sadece A, B, C, D veya E)",
   "explanation": "Kısa ve net çözüm açıklaması"
 }
       `;
 
       try {
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, model: currentModel })
-        });
-        const data = await response.json();
-        const aiResultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        currentQuizData = extractCleanJSON(aiResultText);
-
-        document.getElementById("quizQuestion").textContent = currentQuizData.question;
-
-        const optionsContainer = document.getElementById("quizOptions");
-        optionsContainer.innerHTML = "";
-
+        const text = await callWorker({ prompt, model: currentModel });
+        currentQuizData = extractCleanJSON(text);
+        $("quizQuestion").textContent = currentQuizData.question;
+        const oc = $("quizOptions");
+        oc.innerHTML = "";
         Object.entries(currentQuizData.options).forEach(([key, val]) => {
-          const optBtn = document.createElement("button");
-          optBtn.className = "quiz-opt-btn w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-xl text-xs transition flex items-center gap-3 active:scale-[0.99]";
-          optBtn.innerHTML = `
-            <span class="w-6 h-6 rounded-lg bg-indigo-950 border border-indigo-700/60 flex items-center justify-center font-extrabold text-indigo-300 shrink-0">${key}</span>
-            <span class="text-slate-100 font-medium">${val}</span>
-          `;
-          optBtn.onclick = () => handleQuizSelection(key, optBtn);
-          optionsContainer.appendChild(optBtn);
+          const b = document.createElement("button");
+          b.className = "quiz-opt-btn w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-xl text-xs transition flex items-center gap-3 active:scale-[0.99]";
+          b.innerHTML = `
+            <span class="w-6 h-6 rounded-lg bg-indigo-950 border border-indigo-700/60 flex items-center justify-center font-extrabold text-indigo-300 shrink-0">${esc(key)}</span>
+            <span class="text-slate-100 font-medium">${esc(val)}</span>`;
+          b.onclick = () => handleQuizSelection(key, b);
+          oc.appendChild(b);
         });
-
       } catch (err) {
         console.error("Quiz üretim hatası:", err);
-        document.getElementById("quizQuestion").textContent = "Soru üretilirken bir hata oluştu. Lütfen tekrar deneyin.";
+        $("quizQuestion").textContent = "Soru üretilemedi: " + err.message;
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Arşivimden Yeni Soru Çek</span>`;
+        btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Sıradaki Tekrar Sorusu</span>`;
       }
     };
 
     async function handleQuizSelection(selectedKey, clickedBtn) {
       if (!currentQuizData || !activeQuizQuestion) return;
-
-      const allBtns = document.querySelectorAll(".quiz-opt-btn");
-      allBtns.forEach(b => b.disabled = true);
+      document.querySelectorAll(".quiz-opt-btn").forEach(b => b.disabled = true);
 
       const correctKey = currentQuizData.answer.trim().toUpperCase().charAt(0);
       const isCorrect = selectedKey === correctKey;
+      clickedBtn.className = isCorrect
+        ? "w-full text-left bg-emerald-950/60 border-2 border-emerald-500 p-3.5 rounded-xl text-xs flex items-center gap-3"
+        : "w-full text-left bg-rose-950/60 border-2 border-rose-500 p-3.5 rounded-xl text-xs flex items-center gap-3";
 
-      if (isCorrect) {
-        clickedBtn.className = "w-full text-left bg-emerald-950/60 border-2 border-emerald-500 p-3.5 rounded-xl text-xs flex items-center gap-3";
-      } else {
-        clickedBtn.className = "w-full text-left bg-rose-950/60 border-2 border-rose-500 p-3.5 rounded-xl text-xs flex items-center gap-3";
-      }
-
-      const resDiv = document.getElementById("quizResult");
-      const resTitle = document.getElementById("quizResultTitle");
-      const resExp = document.getElementById("quizExplanation");
-
-      const pathParts = activeQuizQuestion.colPath.split("/");
-      const qRef = doc(db, ...pathParts, activeQuizQuestion.id);
-      let statusBanner = "";
+      const qRef = doc(db, COL, activeQuizQuestion.id);
+      const oldBox = activeQuizQuestion.box || 0;
+      let banner = "";
 
       try {
         if (isCorrect) {
-          const newStreak = (activeQuizQuestion.correctStreak || 0) + 1;
-          if (newStreak >= 2) {
-            await deleteDoc(qRef);
-            statusBanner = `<div class="mt-1.5 p-2 rounded-lg bg-emerald-900/50 text-emerald-200 border border-emerald-700/60">🏆 <b>Mükemmel!</b> Bu konuyu 2 kez üst üste doğru bildiğin için arşivden otomatik olarak mezun edildi (silindi).</div>`;
+          const newBox = oldBox + 1;
+          if (newBox >= 5) {
+            await updateDoc(qRef, { box: 5, learned: true, nextReview: Date.now() + 90 * DAY });
+            banner = `<div class="mt-1.5 p-2 rounded-lg bg-emerald-900/50 text-emerald-200 border border-emerald-700/60">🏆 <b>Mükemmel!</b> Tüm tekrar aşamalarını geçtin, spot "Öğrenilenler"e taşındı. İstersen oradan tekrar aktif edebilirsin.</div>`;
           } else {
-            await updateDoc(qRef, { correctStreak: newStreak });
-            statusBanner = `<div class="mt-1.5 text-emerald-300">⭐ Doğru Serisi: <b>${newStreak}/2</b> (1 kez daha doğru bilirsen arşivden silinecek)</div>`;
+            const days = INTERVAL_DAYS[newBox - 1];
+            await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });
+            banner = `<div class="mt-1.5 text-emerald-300">⭐ Seviye <b>${newBox}/5</b>. Bu spot <b>${days} gün</b> sonra tekrar sorulacak.</div>`;
           }
         } else {
-          await updateDoc(qRef, { correctStreak: 0 });
-          statusBanner = `<div class="mt-1.5 text-rose-300">⚠️ Yanlış cevap! Bu spotun doğru serisi <b>0/2</b> olarak sıfırlandı.</div>`;
+          await updateDoc(qRef, { box: 0, nextReview: Date.now() });
+          banner = `<div class="mt-1.5 text-rose-300">⚠️ Yanlış cevap. Spot <b>Seviye 0</b>'a döndü, kısa sürede tekrar karşına çıkacak.</div>`;
         }
         await loadUserQuestions();
       } catch (e) {
-        console.error("Streak güncellenemedi:", e);
+        console.error("Güncellenemedi:", e);
       }
 
-      resDiv.className = isCorrect 
+      const resDiv = $("quizResult");
+      resDiv.className = isCorrect
         ? "p-4 rounded-2xl border bg-emerald-950/30 border-emerald-800/60 text-emerald-400 space-y-2"
         : "p-4 rounded-2xl border bg-rose-950/30 border-rose-900/60 text-rose-400 space-y-2";
-
-      resTitle.innerHTML = (isCorrect 
-        ? `<div class="text-sm font-extrabold"><i class="fa-solid fa-circle-check mr-1"></i> DOĞRU CEVAP (${correctKey})</div>` 
-        : `<div class="text-sm font-extrabold"><i class="fa-solid fa-circle-xmark mr-1"></i> YANLIŞ CEVAP! (Doğru Şık: ${correctKey})</div>`) + statusBanner;
-
-      resExp.textContent = currentQuizData.explanation;
+      $("quizResultTitle").innerHTML = (isCorrect
+        ? `<div class="text-sm font-extrabold"><i class="fa-solid fa-circle-check mr-1"></i> DOĞRU CEVAP (${esc(correctKey)})</div>`
+        : `<div class="text-sm font-extrabold"><i class="fa-solid fa-circle-xmark mr-1"></i> YANLIŞ CEVAP! (Doğru Şık: ${esc(correctKey)})</div>`) + banner;
+      $("quizExplanation").textContent = currentQuizData.explanation;
       resDiv.classList.remove("hidden");
     }
   </script>

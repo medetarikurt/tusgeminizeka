@@ -2,42 +2,45 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>TUS Asistanı</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#f6f6f5" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#151618" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#f3f4f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#131416" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3406/3406828.png">
   <style>
     :root {
-      --bg: #f6f6f5;
+      --bg: #f3f4f5;
       --surface: #ffffff;
-      --text: #1d1e20;
-      --muted: #6b6e73;
-      --line: #deded9;
-      --accent: #34567d;
+      --raised: #f7f8f9;
+      --text: #1b1d20;
+      --muted: #6a6f76;
+      --line: #dfe2e5;
+      --accent: #36628f;
       --accent-text: #ffffff;
-      --accent-soft: #e9eef4;
+      --accent-soft: #e7eef6;
       --ok: #2b7248;
-      --ok-soft: #e8f3ec;
+      --ok-soft: #e7f2eb;
       --bad: #a8372e;
-      --bad-soft: #f8eae8;
+      --bad-soft: #f8e9e7;
       --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --r: 14px;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #151618;
-        --surface: #1c1d20;
-        --text: #e4e4e1;
-        --muted: #9a9ca1;
-        --line: #2c2e33;
-        --accent: #8fb0d6;
-        --accent-text: #11151a;
-        --accent-soft: #212a35;
+        --bg: #131416;
+        --surface: #1b1c1f;
+        --raised: #222428;
+        --text: #e6e7e8;
+        --muted: #9a9ea5;
+        --line: #2b2d32;
+        --accent: #86aedb;
+        --accent-text: #0f141a;
+        --accent-soft: #212b37;
         --ok: #84c79d;
         --ok-soft: #1c2a21;
         --bad: #e49188;
@@ -48,133 +51,137 @@
     html { background: var(--bg); }
     body {
       margin: 0; min-height: 100vh;
-      font-family: var(--sans); font-size: 15px; line-height: 1.5;
+      font-family: var(--sans); font-size: 16px; line-height: 1.5;
       color: var(--text); background: var(--bg);
-      padding-top: env(safe-area-inset-top, 0px);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
+      -webkit-text-size-adjust: 100%;
     }
     button, input, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; }
-    .wrap { max-width: 640px; margin: 0 auto; padding: 0 18px; }
     .hidden { display: none !important; }
+    .wrap { max-width: 600px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(96px + env(safe-area-inset-bottom, 0px)); }
 
-    /* Üst alan */
-    header { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 0 10px; }
-    header h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
-    #authStatus { font-size: 12px; color: var(--muted); }
-    #authStatus::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
+    /* Üst başlık: ortalı */
+    header { text-align: center; padding: 6px 0 20px; }
+    header h1 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
+    #authStatus { margin-top: 2px; font-size: 12px; color: var(--muted); }
+    #authStatus::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: 1px; }
     #authStatus.ok::before { background: var(--ok); }
     #authStatus.err::before { background: var(--bad); }
 
-    /* Sekmeler */
-    nav { display: flex; gap: 22px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 10; padding-top: env(safe-area-inset-top, 0px); }
-    nav button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 0; margin-bottom: -1px; color: var(--muted); font-weight: 500; }
-    nav button.on { color: var(--text); border-bottom-color: var(--accent); }
-    .count { font-size: 12px; margin-left: 4px; color: var(--muted); }
-    .count.due { color: var(--accent-text); background: var(--accent); border-radius: 9px; padding: 1px 7px; }
+    section { display: grid; gap: 14px; }
 
-    main { padding: 22px 0 90px; }
-    section > * + * { margin-top: 18px; }
+    /* Kart */
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+    .card-title { font-size: 15px; font-weight: 600; margin: 0; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .center { text-align: center; }
 
-    /* Metin ve alanlar */
-    h2 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
-    .muted { color: var(--muted); font-size: 13px; }
-    textarea {
-      width: 100%; resize: vertical; min-height: 84px;
-      background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
-    }
-    textarea:focus, button:focus-visible, label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
-    textarea:focus { outline-offset: 0; }
-
+    /* Butonlar: eşit yükseklik */
     .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-      padding: 9px 14px; font-weight: 500; text-align: center;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 0 16px; width: 100%;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+      font-weight: 550; text-align: center;
     }
-    .btn:hover { border-color: var(--muted); }
+    .btn:active { transform: scale(0.985); }
     .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-    .btn.primary:hover { opacity: .92; }
-    .btn.block { width: 100%; }
     .btn:disabled { opacity: .55; cursor: default; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .row > .btn { flex: 1; }
-    .link { background: none; border: 0; padding: 2px 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
-    .link:hover { color: var(--text); }
+    .btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .link { background: none; border: 0; padding: 6px 0; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
     .link.danger:hover { color: var(--bad); }
+    button:focus-visible, textarea:focus-visible, label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
-    .seg button { background: none; border: 0; padding: 6px 12px; font-size: 13px; color: var(--muted); }
-    .seg button.on { background: var(--accent-soft); color: var(--text); font-weight: 600; }
-    .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    /* Eşit bölmeli seçici */
+    .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px; }
+    .seg button { background: none; border: 0; border-radius: 9px; padding: 9px 8px; font-size: 14px; color: var(--muted); text-align: center; }
+    .seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
 
-    #imagePreviewContainer img { width: 100%; max-height: 260px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); display: block; }
-    #imagePreviewContainer .bar { margin-top: 8px; }
+    textarea {
+      width: 100%; min-height: 92px; resize: vertical; display: block;
+      background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 16px;
+    }
+    textarea::placeholder { color: var(--muted); }
+
+    /* Tarama kartı */
+    .scan { display: grid; gap: 12px; text-align: center; }
+    .scan .hint { font-size: 13px; color: var(--muted); }
+    #imagePreviewContainer { display: grid; gap: 10px; }
+    #imagePreviewContainer img { width: 100%; max-height: 300px; object-fit: contain; border-radius: 10px; background: var(--raised); display: block; }
+    .status-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: var(--muted); min-height: 24px; }
+    .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
 
     /* Okuma metni */
-    .reading { font-family: var(--serif); font-size: 16.5px; line-height: 1.7; }
+    .reading { font-family: var(--serif); font-size: 17px; line-height: 1.7; }
     .reading strong { font-weight: 700; }
-    .spot { font-family: var(--serif); font-size: 17px; line-height: 1.6; padding: 2px 0 2px 14px; border-left: 3px solid var(--accent); }
-    .label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .spot { font-family: var(--serif); font-size: 17.5px; line-height: 1.6; padding: 12px 14px; background: var(--accent-soft); border-radius: 10px; }
+    .label { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
     .pre { white-space: pre-wrap; }
+    .meta { color: var(--muted); font-size: 14px; }
 
-    /* Sonuç alanı */
-    #resultCard { border-top: 1px solid var(--line); padding-top: 20px; }
-    #resultCard h3 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+    /* Sonuç */
+    .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .result-head h3 { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.3; }
+    .stack > * + * { margin-top: 14px; }
 
-    /* Arşiv listesi */
-    .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+    /* Arşiv */
+    .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 1px 0; }
     .chips::-webkit-scrollbar { display: none; }
-    .chip { white-space: nowrap; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; color: var(--muted); }
-    .chip.on { background: var(--accent-soft); border-color: transparent; color: var(--text); font-weight: 600; }
-
-    .item { padding: 18px 0; border-top: 1px solid var(--line); }
-    #questionsList { margin-top: 10px; }
-    #questionsList .item:first-child { border-top: 0; padding-top: 8px; }
-    .item-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-    .item-title { font-weight: 600; }
-    .item-meta { color: var(--muted); font-size: 13px; margin-top: 1px; }
-    .item .spot { margin: 12px 0 10px; }
+    .chip { white-space: nowrap; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+    #questionsList { display: grid; gap: 12px; }
+    .item-title { font-weight: 650; line-height: 1.3; }
     .item-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .item-foot .actions { display: flex; gap: 14px; }
-    details summary { cursor: pointer; color: var(--muted); font-size: 13px; list-style: none; }
+    .item-foot .actions { display: flex; gap: 16px; }
+    details { border-top: 1px solid var(--line); padding-top: 10px; }
+    details summary { cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 550; list-style: none; text-align: center; }
     details summary::-webkit-details-marker { display: none; }
-    details summary::before { content: "+ "; }
-    details[open] summary::before { content: "– "; }
-    details .reading { margin-top: 10px; font-size: 16px; }
-    .empty { padding: 36px 0; text-align: center; color: var(--muted); }
+    details[open] summary { margin-bottom: 10px; }
+    details .reading { font-size: 16px; }
+    .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
 
-    /* Quiz */
-    #quizContainer { border-top: 1px solid var(--line); padding-top: 18px; }
-    #quizContainer > * + * { margin-top: 16px; }
-    .quiz-q { font-family: var(--serif); font-size: 17px; line-height: 1.65; }
+    /* Test */
+    .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
     .opt {
-      display: flex; gap: 12px; align-items: baseline; width: 100%; text-align: left;
-      background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 11px 13px;
+      display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
+      background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; min-height: 48px;
     }
     .opt + .opt { margin-top: 8px; }
-    .opt:not(:disabled):hover { border-color: var(--muted); }
-    .opt .k { color: var(--muted); font-weight: 600; width: 1ch; flex-shrink: 0; }
+    .opt .k { font-weight: 650; color: var(--muted); width: 1.2ch; flex-shrink: 0; }
     .opt.right { border-color: var(--ok); background: var(--ok-soft); }
     .opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
     .opt:disabled { cursor: default; color: var(--text); }
-    #quizResult { border-radius: 8px; padding: 14px; }
+    #quizResult { border-radius: 12px; padding: 14px; }
     #quizResult.right { background: var(--ok-soft); }
     #quizResult.wrong { background: var(--bad-soft); }
-    #quizResultTitle { font-weight: 600; }
+    #quizResultTitle { font-weight: 650; }
     #quizResult.right #quizResultTitle { color: var(--ok); }
     #quizResult.wrong #quizResultTitle { color: var(--bad); }
-    #quizResult .note { margin-top: 6px; font-size: 14px; color: var(--muted); }
-    #quizExplanation { margin-top: 10px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; }
-    #quizResult .btn { margin-top: 14px; }
+    #quizNote { margin-top: 4px; font-size: 14px; color: var(--muted); }
+    #quizExplanation { margin: 10px 0 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
 
-    /* Geri al bildirimi */
+    /* Alt sekme çubuğu: üç eşit sütun */
+    nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      background: var(--surface); border-top: 1px solid var(--line);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    nav .inner { max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+    nav button { position: relative; background: none; border: 0; padding: 10px 4px 9px; color: var(--muted); display: grid; justify-items: center; gap: 3px; font-size: 12px; font-weight: 550; }
+    nav button svg { width: 24px; height: 24px; }
+    nav button.on { color: var(--accent); }
+    nav .badge { position: absolute; top: 5px; left: calc(50% + 7px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 650; }
+
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%);
-      bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-      background: var(--text); color: var(--bg); border-radius: 8px; padding: 10px 14px;
-      display: flex; gap: 16px; align-items: center; font-size: 14px; z-index: 50;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      background: var(--text); color: var(--bg); border-radius: 12px; padding: 11px 16px;
+      display: flex; gap: 18px; align-items: center; font-size: 14px; z-index: 50; white-space: nowrap;
     }
-    #toast button { background: none; border: 0; color: inherit; font-weight: 600; text-decoration: underline; padding: 0; }
+    #toast button { background: none; border: 0; color: inherit; font-weight: 650; text-decoration: underline; padding: 0; }
   </style>
 </head>
 <body>
@@ -185,54 +192,53 @@
     <div id="authStatus">Bağlanıyor</div>
   </header>
 
-  <nav>
-    <button id="tabAddBtn" class="on" onclick="switchTab('add')">Soru ekle</button>
-    <button id="tabArchiveBtn" onclick="switchTab('archive')">Arşiv<span class="count" id="archiveCount">0</span></button>
-    <button id="tabQuizBtn" onclick="switchTab('quiz')">Test<span class="count due hidden" id="dueBadge">0</span></button>
-  </nav>
-
   <main>
 
     <!-- Soru ekle -->
     <section id="sectionAdd">
-      <div class="bar">
-        <span class="muted">Model</span>
-        <div class="seg">
-          <button id="modelFlash" class="on" onclick="setModel('gemini-3.8-flash')">Flash, hızlı</button>
-          <button id="modelPro" onclick="setModel('gemini-3.8-pro')">Pro, derin vaka</button>
+      <div class="seg" role="group" aria-label="Model">
+        <button id="modelFlash" class="on" onclick="setModel('gemini-3.8-flash')">Flash, hızlı</button>
+        <button id="modelPro" onclick="setModel('gemini-3.8-pro')">Pro, derin vaka</button>
+      </div>
+
+      <div class="card scan">
+        <h2 class="card-title">Soruyu tara</h2>
+        <div class="pair">
+          <label class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Fotoğraf çek
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelect(event)">
+          </label>
+          <label class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>
+            Galeriden seç
+            <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
+          </label>
+        </div>
+        <div class="hint">Fotoğraf seçilince analiz otomatik başlar.</div>
+
+        <div id="imagePreviewContainer" class="hidden">
+          <img id="imagePreview" alt="Seçilen soru görseli">
+          <div class="status-row" id="scanStatus"></div>
         </div>
       </div>
 
-      <div class="row">
-        <label class="btn primary">
-          Fotoğraf çek
-          <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelect(event)">
-        </label>
-        <label class="btn">
-          Galeriden seç
-          <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
-        </label>
+      <div class="card stack">
+        <h2 class="card-title">Metinle ekle</h2>
+        <textarea id="questionInput" rows="3" placeholder="Soruyu yaz ya da fotoğrafa not ekle. Örnek: C şıkkını anlamadım."></textarea>
+        <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()">Analiz et ve kaydet</button>
       </div>
 
-      <div id="imagePreviewContainer" class="hidden">
-        <img id="imagePreview" alt="Seçilen soru görseli">
-        <div class="bar"><span class="muted">Görsel hazır</span><button class="link danger" onclick="clearImage()">Kaldır</button></div>
-      </div>
-
-      <textarea id="questionInput" rows="3" placeholder="Soruyu yazabilir ya da fotoğrafa not ekleyebilirsin. Örnek: C şıkkını anlamadım."></textarea>
-
-      <button id="analyzeBtn" class="btn primary block" onclick="analyzeAndSaveQuestion()">Analiz et ve kaydet</button>
-
-      <div id="resultCard" class="hidden">
-        <div class="bar" style="align-items:flex-start">
+      <div id="resultCard" class="card stack hidden">
+        <div class="result-head">
           <div>
             <h3 id="resSubBadge">Konu</h3>
-            <div class="item-meta" id="resBadge">Branş</div>
+            <div class="meta" id="resBadge">Branş</div>
           </div>
-          <span id="resSaved" class="muted">Kaydedildi</span>
+          <span id="resSaved" class="meta">Kaydedildi</span>
         </div>
-        <div class="spot" id="resKeyTakeaway" style="margin-top:16px"></div>
-        <div style="margin-top:20px">
+        <div class="spot" id="resKeyTakeaway"></div>
+        <div>
           <div class="label">Çözüm ve patofizyoloji</div>
           <div id="resExplanation" class="reading pre"></div>
         </div>
@@ -241,43 +247,61 @@
 
     <!-- Arşiv -->
     <section id="sectionArchive" class="hidden">
-      <div class="bar">
-        <div class="seg">
-          <button id="statusActive" class="on" onclick="setStatus('active')">Çalışılacak <span id="cntActive">0</span></button>
-          <button id="statusLearned" onclick="setStatus('learned')">Öğrenilen <span id="cntLearned">0</span></button>
-        </div>
-        <button class="link" onclick="loadUserQuestions()">Yenile</button>
+      <div class="seg">
+        <button id="statusActive" class="on" onclick="setStatus('active')">Çalışılacak <span id="cntActive">0</span></button>
+        <button id="statusLearned" onclick="setStatus('learned')">Öğrenilen <span id="cntLearned">0</span></button>
       </div>
       <div id="branchFilters" class="chips"></div>
       <div id="questionsList"><div class="empty">Yükleniyor</div></div>
+      <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
     </section>
 
     <!-- Test -->
     <section id="sectionQuiz" class="hidden">
-      <div>
-        <h2>Tekrar testi</h2>
-        <div class="muted">Önce vadesi gelen spotlar sorulur. Bugün vadesi gelen: <span id="dueCount">0</span></div>
-      </div>
-      <button id="newQuizBtn" class="btn primary block" onclick="generateQuiz()">Soru getir</button>
-
-      <div id="quizContainer" class="hidden">
-        <div class="bar">
-          <span id="quizSubBadge" class="muted">Konu</span>
-          <span id="quizStreakBadge" class="muted">Seviye 0/5</span>
+      <div class="card stack center">
+        <div>
+          <h2 class="card-title">Tekrar testi</h2>
+          <div class="muted">Bugün vadesi gelen spot: <b id="dueCount">0</b></div>
         </div>
-        <p id="quizQuestion" class="quiz-q" style="margin-bottom:0"></p>
+        <button id="newQuizBtn" class="btn primary" onclick="generateQuiz()">Soru getir</button>
+      </div>
+
+      <div id="quizContainer" class="card stack hidden">
+        <div class="bar">
+          <span id="quizSubBadge" class="meta">Konu</span>
+          <span id="quizStreakBadge" class="meta">Seviye 0/5</span>
+        </div>
+        <p id="quizQuestion" class="quiz-q"></p>
         <div id="quizOptions"></div>
         <div id="quizResult" class="hidden">
           <div id="quizResultTitle"></div>
-          <div id="quizNote" class="note"></div>
+          <div id="quizNote"></div>
           <p id="quizExplanation"></p>
-          <button class="btn block" onclick="generateQuiz()">Sıradaki soru</button>
+          <button class="btn" onclick="generateQuiz()">Sıradaki soru</button>
         </div>
       </div>
     </section>
 
   </main>
 </div>
+
+<nav>
+  <div class="inner">
+    <button id="tabAddBtn" class="on" onclick="switchTab('add')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Soru ekle
+    </button>
+    <button id="tabArchiveBtn" onclick="switchTab('archive')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h14"/></svg>
+      Arşiv (<span id="archiveCount">0</span>)
+    </button>
+    <button id="tabQuizBtn" onclick="switchTab('quiz')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>
+      Test
+      <span class="badge hidden" id="dueBadge">0</span>
+    </button>
+  </div>
+</nav>
 
 <div id="toast" class="hidden"><span id="toastText"></span><button id="toastUndo">Geri al</button></div>
 
@@ -310,10 +334,10 @@
   let selectedBranchFilter = "All";
   let selectedStatus = "active";
   let activeQuizQuestion = null, currentQuizData = null;
+  let analyzing = false;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  // Kaçışlı metinde **kalın** işaretlerini kalın yazıya çevirir
   const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   function setAuth(text, cls) { const el = $("authStatus"); el.textContent = text; el.className = cls || ""; }
@@ -377,6 +401,7 @@
     $("tabAddBtn").classList.toggle("on", tab === "add");
     $("tabArchiveBtn").classList.toggle("on", tab === "archive");
     $("tabQuizBtn").classList.toggle("on", tab === "quiz");
+    window.scrollTo({ top: 0 });
   };
 
   window.setModel = (model) => {
@@ -386,10 +411,13 @@
     $("modelPro").classList.toggle("on", isPro);
   };
 
+  // Fotoğraf seçilince küçültüp otomatik analizi başlatır
   window.handleImageSelect = (event) => {
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file || analyzing) return;
     selectedImageMime = "image/jpeg";
+    $("scanStatus").innerHTML = `<span class="spin"></span><span>Görsel hazırlanıyor…</span>`;
+    $("imagePreviewContainer").classList.remove("hidden");
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -404,7 +432,7 @@
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         selectedImageBase64 = dataUrl.split(",")[1];
         $("imagePreview").src = dataUrl;
-        $("imagePreviewContainer").classList.remove("hidden");
+        analyzeAndSaveQuestion();
       };
       img.src = e.target.result;
     };
@@ -415,6 +443,7 @@
     selectedImageBase64 = null; selectedImageMime = null;
     $("cameraInput").value = ""; $("galleryInput").value = "";
     $("imagePreviewContainer").classList.add("hidden");
+    $("scanStatus").innerHTML = "";
   };
 
   // Benzer spot kontrolü
@@ -433,11 +462,14 @@
   }
 
   window.analyzeAndSaveQuestion = async () => {
+    if (analyzing) return;
     const questionText = $("questionInput").value.trim();
     if (!questionText && !selectedImageBase64) { alert("Önce sorunun fotoğrafını çek ya da metni yaz."); return; }
 
+    analyzing = true;
     const btn = $("analyzeBtn");
-    btn.disabled = true; btn.textContent = "Çözülüyor…";
+    btn.disabled = true; btn.textContent = "Analiz ediliyor…";
+    if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Analiz ediliyor…</span>`;
 
     const prompt = `
 Sen uzman bir TUS (Tıpta Uzmanlık Sınavı) hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
@@ -486,10 +518,13 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       $("questionInput").value = "";
       clearImage();
       await loadUserQuestions();
+      $("resultCard").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       console.error("Analiz hatası:", err);
+      if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Aşağıdaki butonla tekrar dene.";
       alert("Çözüm sırasında hata oluştu: " + err.message);
     } finally {
+      analyzing = false;
       btn.disabled = false; btn.textContent = "Analiz et ve kaydet";
     }
   };
@@ -582,22 +617,20 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       return;
     }
     box.innerHTML = filtered.map(q => `
-      <article class="item">
-        <div class="item-head">
-          <div>
-            <div class="item-title">${esc(q.subTopic || q.topic || "Konu yok")}</div>
-            <div class="item-meta">${esc([q.branch, q.topic].filter(Boolean).join(", "))}</div>
-          </div>
+      <article class="card stack">
+        <div>
+          <div class="item-title">${esc(q.subTopic || q.topic || "Konu yok")}</div>
+          <div class="meta">${esc([q.branch, q.topic].filter(Boolean).join(", "))}</div>
         </div>
         <div class="spot">${fmt(q.keyTakeaway)}</div>
         <div class="item-foot">
-          <span class="muted">Seviye ${q.box}/5, ${reviewLabel(q)}</span>
+          <span class="meta">Seviye ${q.box}/5, ${reviewLabel(q)}</span>
           <div class="actions">
             ${q.learned ? `<button class="link" onclick="reactivateQuestion('${esc(q.id)}')">Tekrar aktif et</button>` : ""}
             <button class="link danger" onclick="deleteQuestion('${esc(q.id)}')">Sil</button>
           </div>
         </div>
-        <details style="margin-top:12px">
+        <details>
           <summary>Çözümü göster</summary>
           <div class="reading pre">${fmt(q.aiExplanation)}</div>
         </details>
@@ -704,6 +737,7 @@ Sadece aşağıdaki JSON formatında yanıt ver:
     $("quizResultTitle").textContent = isCorrect ? `Doğru, cevap ${correctKey}` : `Yanlış, doğru cevap ${correctKey}`;
     $("quizNote").textContent = note;
     $("quizExplanation").innerHTML = fmt(currentQuizData.explanation);
+    res.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 </script>
 </body>

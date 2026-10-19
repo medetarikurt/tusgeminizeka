@@ -251,6 +251,12 @@
           <h2 class="card-title">Tekrar testi</h2>
           <div class="muted">Bugün vadesi gelen spot: <b id="dueCount">0</b></div>
         </div>
+        <div class="seg" id="countSeg" role="group" aria-label="Soru sayısı">
+          <button data-n="1" onclick="setQuizCount(1)">1 soru</button>
+          <button data-n="3" onclick="setQuizCount(3)">3 soru</button>
+          <button data-n="5" onclick="setQuizCount(5)">5 soru</button>
+          <button data-n="10" onclick="setQuizCount(10)">10 soru</button>
+        </div>
         <button id="newQuizBtn" class="btn primary" onclick="generateQuiz()">Soru getir</button>
       </div>
 
@@ -265,7 +271,7 @@
           <div id="quizResultTitle"></div>
           <div id="quizNote"></div>
           <p id="quizExplanation"></p>
-          <button class="btn" onclick="generateQuiz()">Sıradaki soru</button>
+          <button id="nextQuizBtn" class="btn" onclick="nextQuiz()">Sıradaki soru</button>
         </div>
       </div>
     </section>
@@ -323,6 +329,11 @@
   let selectedStatus = "active";
   let activeQuizQuestion = null, currentQuizData = null;
   let analyzing = false;
+
+  // Toplu test: üretilen soruların kuyruğu ve seçili soru sayısı
+  let quizQueue = [], quizIndex = 0;
+  let quizCount = parseInt(localStorage.getItem("tus_quiz_count") || "5", 10);
+  if (![1, 3, 5, 10].includes(quizCount)) quizCount = 5;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -399,7 +410,7 @@
     $("modelPro").classList.toggle("on", isPro);
   };
 
-  // İstediğin gibi fotoğraf seçilince OTO ANALİZ ETMEZ, sadece ekrana basar. Sen butona basarsın.
+  // Fotoğraf seçilince otomatik analiz etmez, sadece ekrana basar. Sen butona basarsın.
   window.handleImageSelect = (event) => {
     const file = event.target.files[0];
     if (!file || analyzing) return;
@@ -623,7 +634,16 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       </article>`).join("");
   }
 
-  function pickNextQuestion() {
+  // ===================== TOPLU TEST =====================
+
+  window.setQuizCount = (n) => {
+    quizCount = n;
+    localStorage.setItem("tus_quiz_count", String(n));
+    document.querySelectorAll("#countSeg button").forEach(b => b.classList.toggle("on", Number(b.dataset.n) === n));
+  };
+
+  // Vadesi gelen spotlardan n tanesini seçer (her spot sette bir kez)
+  function pickQuestions(n) {
     const now = Date.now();
     const active = allQuestions.filter(q => !q.learned);
     if (!active.length) { alert("Test için arşivinde çalışılacak en az bir spot olmalı."); return null; }
@@ -632,75 +652,123 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
       pool = [...active].sort((a, b) => a.nextReview - b.nextReview);
     }
-    return pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
+    const top = pool.slice(0, Math.max(n, 5));
+    for (let i = top.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [top[i], top[j]] = [top[j], top[i]];
+    }
+    return top.slice(0, n);
   }
 
-  // >>> HIZ OPTİMİZASYONU YAPILMIŞ VE ÇÖKME KORUMALI TEST ÜRETİCİ <<<
+  function parseBatch(raw) {
+    const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+    try { return JSON.parse(cleaned); } catch (e) {}
+    const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+    return JSON.parse(cleaned.substring(a, b + 1));
+  }
+
+  function normalizeOptions(opts) {
+    if (!opts) return null;
+    if (Array.isArray(opts)) {
+      const o = {};
+      opts.forEach((v, i) => { o[String.fromCharCode(65 + i)] = typeof v === "object" ? Object.values(v)[0] : v; });
+      return o;
+    }
+    return opts;
+  }
+
+  function showQuizQuestion() {
+    const { src, data } = quizQueue[quizIndex];
+    activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
+    currentQuizData = data;
+
+    $("quizResult").classList.add("hidden");
+    $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + `  (${quizIndex + 1}/${quizQueue.length})`;
+    $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/5`;
+    $("quizQuestion").textContent = data.question;
+    $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
+
+    const oc = $("quizOptions");
+    oc.innerHTML = "";
+    Object.entries(data.options).forEach(([key, val]) => {
+      const b = document.createElement("button");
+      b.className = "opt"; b.dataset.key = key;
+      b.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
+      b.onclick = () => handleQuizSelection(key, b);
+      oc.appendChild(b);
+    });
+  }
+
+  window.nextQuiz = () => {
+    if (quizIndex + 1 < quizQueue.length) {
+      quizIndex++;
+      showQuizQuestion();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      generateQuiz();
+    }
+  };
+
   window.generateQuiz = async () => {
-    const picked = pickNextQuestion();
+    const picked = pickQuestions(quizCount);
     if (!picked) return;
-    activeQuizQuestion = picked;
 
     const btn = $("newQuizBtn");
-    btn.disabled = true; btn.textContent = "Soru hazırlanıyor…";
-
+    btn.disabled = true; btn.textContent = "Sorular hazırlanıyor…";
     $("quizContainer").classList.remove("hidden");
-    $("quizQuestion").textContent = "Spot bilgiden kısa ve net bir vaka sorusu hazırlanıyor…";
+    $("quizQuestion").textContent = picked.length > 1
+      ? `${picked.length} soru hazırlanıyor, bu biraz sürebilir…`
+      : "Soru hazırlanıyor…";
     $("quizOptions").innerHTML = "";
     $("quizResult").classList.add("hidden");
-    $("quizSubBadge").textContent = [picked.branch, picked.topic].filter(Boolean).join(", ");
-    $("quizStreakBadge").textContent = `Seviye ${picked.box}/5`;
+    $("quizSubBadge").textContent = "";
+    $("quizStreakBadge").textContent = "";
 
-    // Prompt çok kısaltıldı, LLM'den uzun açıklamalar yapmaması istendi (Hız artışı için)
-    const prompt = `Görevin: Aşağıdaki TUS spot bilgisini test eden KISA ve NET bir klinik vaka sorusu yaz. Hızlı üretmen için laf kalabalığı yapma.
-Konu: ${picked.branch} - ${picked.topic}
-Spot Bilgi: ${picked.keyTakeaway}
+    const spots = picked.map((q, i) => `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`).join("\n");
+    const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, KISA ve NET bir klinik vaka sorusu yaz. Laf kalabalığı yapma.
 
-SADECE ŞU JSON FORMATINDA DÖN:
+Spotlar:
+${spots}
+
+SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
 {
-  "question": "Kısa klinik vaka metni",
-  "options": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
-  "answer": "A",
-  "explanation": "1 cümlelik çok net çözüm"
+  "questions": [
+    {
+      "no": 1,
+      "question": "Kısa klinik vaka metni",
+      "options": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
+      "answer": "A",
+      "explanation": "1 cümlelik çok net çözüm"
+    }
+  ]
 }`;
 
     try {
       const text = await callWorker({ prompt, model: currentModel });
-      currentQuizData = extractCleanJSON(text);
+      const data = parseBatch(text);
 
-      // --- CRASH KORUMASI: Eğer kota dolduysa sistemi çökertmeden ekrana bas ---
-      if (currentQuizData.branch === "SİSTEM MESAJI" || currentQuizData.branch === "API HATASI" || currentQuizData.branch === "Kota Doldu") {
-          throw new Error((currentQuizData.keyTakeaway || "") + " " + (currentQuizData.explanation || "API Kotası Hatası"));
-      }
-      if (!currentQuizData.options) {
-          throw new Error("Yapay zeka şıkları oluşturamadı, lütfen tekrar deneyin.");
+      // Worker sistem mesajı döndürdüyse (kota vb.) çökmeden ekrana bas
+      if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") {
+        throw new Error((data.keyTakeaway || "") + " " + (data.explanation || ""));
       }
 
-      $("quizQuestion").textContent = currentQuizData.question || "Soru metni alınamadı.";
-      const oc = $("quizOptions");
-      oc.innerHTML = "";
-      
-      let opts = currentQuizData.options;
-      if (Array.isArray(opts)) {
-         const newOpts = {};
-         opts.forEach((o, i) => {
-            const k = String.fromCharCode(65 + i);
-            newOpts[k] = typeof o === 'object' ? Object.values(o)[0] : o;
-         });
-         opts = newOpts;
-      }
-
-      Object.entries(opts).forEach(([key, val]) => {
-        const b = document.createElement("button");
-        b.className = "opt"; b.dataset.key = key;
-        b.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
-        b.onclick = () => handleQuizSelection(key, b);
-        oc.appendChild(b);
+      const arr = Array.isArray(data) ? data : (Array.isArray(data.questions) ? data.questions : []);
+      quizQueue = [];
+      arr.forEach((item, idx) => {
+        const opts = normalizeOptions(item.options);
+        if (!item.question || !opts) return;
+        const src = picked[(Number(item.no) || idx + 1) - 1] || picked[idx];
+        if (!src) return;
+        quizQueue.push({ src, data: { ...item, options: opts } });
       });
+
+      if (!quizQueue.length) throw new Error("Yapay zeka soruları oluşturamadı, tekrar dene.");
+      quizIndex = 0;
+      showQuizQuestion();
     } catch (err) {
       console.error("Quiz üretim hatası:", err);
       $("quizQuestion").textContent = "Soru üretilemedi: " + err.message;
-      $("quizOptions").innerHTML = ""; 
+      $("quizOptions").innerHTML = "";
     } finally {
       btn.disabled = false; btn.textContent = "Soru getir";
     }
@@ -746,6 +814,9 @@ SADECE ŞU JSON FORMATINDA DÖN:
     res.classList.remove("hidden");
     res.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+
+  // Sayfa açılınca seçili soru sayısını işaretle
+  setQuizCount(quizCount);
 </script>
 </body>
 </html>

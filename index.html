@@ -60,7 +60,6 @@
     .hidden { display: none !important; }
     .wrap { max-width: 600px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(96px + env(safe-area-inset-bottom, 0px)); }
 
-    /* Üst başlık: ortalı */
     header { text-align: center; padding: 6px 0 20px; }
     header h1 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
     #authStatus { margin-top: 2px; font-size: 12px; color: var(--muted); }
@@ -70,13 +69,11 @@
 
     section { display: grid; gap: 14px; }
 
-    /* Kart */
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
     .card-title { font-size: 15px; font-weight: 600; margin: 0; }
     .muted { color: var(--muted); font-size: 14px; }
     .center { text-align: center; }
 
-    /* Butonlar: eşit yükseklik */
     .btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       min-height: 48px; padding: 0 16px; width: 100%;
@@ -92,7 +89,6 @@
     .link.danger:hover { color: var(--bad); }
     button:focus-visible, textarea:focus-visible, label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    /* Eşit bölmeli seçici */
     .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px; }
     .seg button { background: none; border: 0; border-radius: 9px; padding: 9px 8px; font-size: 14px; color: var(--muted); text-align: center; }
     .seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
@@ -103,7 +99,6 @@
     }
     textarea::placeholder { color: var(--muted); }
 
-    /* Tarama kartı */
     .scan { display: grid; gap: 12px; text-align: center; }
     .scan .hint { font-size: 13px; color: var(--muted); }
     #imagePreviewContainer { display: grid; gap: 10px; }
@@ -113,7 +108,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
 
-    /* Okuma metni */
     .reading { font-family: var(--serif); font-size: 17px; line-height: 1.7; }
     .reading strong { font-weight: 700; }
     .spot { font-family: var(--serif); font-size: 17.5px; line-height: 1.6; padding: 12px 14px; background: var(--accent-soft); border-radius: 10px; }
@@ -121,12 +115,10 @@
     .pre { white-space: pre-wrap; }
     .meta { color: var(--muted); font-size: 14px; }
 
-    /* Sonuç */
     .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
     .result-head h3 { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.3; }
     .stack > * + * { margin-top: 14px; }
 
-    /* Arşiv */
     .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 1px 0; }
     .chips::-webkit-scrollbar { display: none; }
     .chip { white-space: nowrap; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
@@ -142,7 +134,6 @@
     details .reading { font-size: 16px; }
     .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
 
-    /* Test */
     .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
     .opt {
@@ -163,7 +154,6 @@
     #quizNote { margin-top: 4px; font-size: 14px; color: var(--muted); }
     #quizExplanation { margin: 10px 0 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
 
-    /* Alt sekme çubuğu: üç eşit sütun */
     nav {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
       background: var(--surface); border-top: 1px solid var(--line);
@@ -171,7 +161,6 @@
     }
     nav .inner { max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
     nav button { position: relative; background: none; border: 0; padding: 10px 4px 9px; color: var(--muted); display: grid; justify-items: center; gap: 3px; font-size: 12px; font-weight: 550; }
-    nav button { white-space: nowrap; }
     nav button svg { width: 24px; height: 24px; }
     nav button.on { color: var(--accent); }
     nav .badge { position: absolute; top: 5px; left: calc(50% + 7px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 650; }
@@ -195,7 +184,6 @@
 
   <main>
 
-    <!-- Soru ekle -->
     <section id="sectionAdd">
       <div class="seg" role="group" aria-label="Model">
         <button id="modelFlash" class="on" onclick="setModel('gemini-3.8-flash')">Flash, hızlı</button>
@@ -216,11 +204,12 @@
             <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
           </label>
         </div>
-        <div class="hint">Fotoğraf seçilince analiz otomatik başlar.</div>
+        <div class="hint">Fotoğraf seçilince otomatik analize başlar.</div>
 
         <div id="imagePreviewContainer" class="hidden">
           <img id="imagePreview" alt="Seçilen soru görseli">
           <div class="status-row" id="scanStatus"></div>
+          <button class="link danger" onclick="clearImage()">Görseli Kaldır</button>
         </div>
       </div>
 
@@ -246,7 +235,6 @@
       </div>
     </section>
 
-    <!-- Arşiv -->
     <section id="sectionArchive" class="hidden">
       <div class="seg">
         <button id="statusActive" class="on" onclick="setStatus('active')">Çalışılacak <span id="cntActive">0</span></button>
@@ -257,7 +245,6 @@
       <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
     </section>
 
-    <!-- Test -->
     <section id="sectionQuiz" class="hidden">
       <div class="card stack center">
         <div>
@@ -294,7 +281,7 @@
     </button>
     <button id="tabArchiveBtn" onclick="switchTab('archive')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h14"/></svg>
-      <span>Arşiv <span id="archiveCount">0</span></span>
+      Arşiv (<span id="archiveCount">0</span>)
     </button>
     <button id="tabQuizBtn" onclick="switchTab('quiz')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>
@@ -336,8 +323,6 @@
   let selectedStatus = "active";
   let activeQuizQuestion = null, currentQuizData = null;
   let analyzing = false;
-  let quizBusy = false;
-  let nextPrefetch = null;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -393,9 +378,7 @@
     $("toastText").textContent = text;
     t.classList.remove("hidden");
     clearTimeout(showToast.timer);
-    const u = $("toastUndo");
-    u.classList.toggle("hidden", !onUndo);
-    u.onclick = onUndo ? async () => { t.classList.add("hidden"); await onUndo(); } : null;
+    $("toastUndo").onclick = async () => { t.classList.add("hidden"); await onUndo(); };
     showToast.timer = setTimeout(() => t.classList.add("hidden"), 7000);
   }
 
@@ -407,7 +390,6 @@
     $("tabArchiveBtn").classList.toggle("on", tab === "archive");
     $("tabQuizBtn").classList.toggle("on", tab === "quiz");
     window.scrollTo({ top: 0 });
-    if (tab === "quiz") startPrefetch();
   };
 
   window.setModel = (model) => {
@@ -417,28 +399,27 @@
     $("modelPro").classList.toggle("on", isPro);
   };
 
-  // Fotoğraf seçilince küçültüp otomatik analizi başlatır
+  // İstediğin gibi fotoğraf seçilince OTO ANALİZ ETMEZ, sadece ekrana basar. Sen butona basarsın.
   window.handleImageSelect = (event) => {
     const file = event.target.files[0];
     if (!file || analyzing) return;
     selectedImageMime = "image/jpeg";
-    $("scanStatus").innerHTML = `<span class="spin"></span><span>Görsel hazırlanıyor…</span>`;
+    $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ Fotoğraf eklendi. (Gerekirse notunu yazıp Analiz Et'e bas)</span>`;
     $("imagePreviewContainer").classList.remove("hidden");
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const max = 1024;
+        const max = 1280;
         let w = img.width, h = img.height;
         if (w > h) { if (w > max) { h *= max / w; w = max; } }
         else { if (h > max) { w *= max / h; h = max; } }
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         selectedImageBase64 = dataUrl.split(",")[1];
         $("imagePreview").src = dataUrl;
-        analyzeAndSaveQuestion();
       };
       img.src = e.target.result;
     };
@@ -452,7 +433,6 @@
     $("scanStatus").innerHTML = "";
   };
 
-  // Benzer spot kontrolü
   const words = s => new Set(String(s || "").toLowerCase().replace(/[^a-z0-9çğıöşüâî\s]/gi, " ").split(/\s+/).filter(w => w.length > 2));
   function similarity(a, b) {
     const A = words(a), B = words(b);
@@ -475,7 +455,7 @@
     analyzing = true;
     const btn = $("analyzeBtn");
     btn.disabled = true; btn.textContent = "Analiz ediliyor…";
-    if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Analiz ediliyor…</span>`;
+    if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
 
     const prompt = `
 Sen uzman bir TUS (Tıpta Uzmanlık Sınavı) hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
@@ -495,7 +475,7 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       const parsed = extractCleanJSON(text);
       let saved = false;
 
-      if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI") {
+      if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI" && parsed.branch !== "Kota Doldu") {
         const dup = findDuplicate(parsed);
         let doSave = true;
         if (dup) doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
@@ -527,7 +507,7 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       $("resultCard").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       console.error("Analiz hatası:", err);
-      if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Aşağıdaki butonla tekrar dene.";
+      if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Lütfen tekrar dene.";
       alert("Çözüm sırasında hata oluştu: " + err.message);
     } finally {
       analyzing = false;
@@ -542,7 +522,7 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       snap.forEach(d => {
         const data = d.data();
         if (data.deleted === true) return;
-        if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI") return;
+        if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") return;
         items.push({
           id: d.id, ...data,
           box: typeof data.box === "number" ? data.box : 0,
@@ -643,161 +623,128 @@ Kullanıcı Notu / Soru Metni: ${questionText}
       </article>`).join("");
   }
 
-  // Vadesi gelen bir spot seçer. Sessizdir, kullanıcıya soru sormaz.
-  function pickDue(excludeId) {
-    const now = Date.now();
-    const pool = allQuestions
-      .filter(q => !q.learned && q.id !== excludeId && q.nextReview <= now)
-      .sort((a, b) => a.nextReview - b.nextReview);
-    return pool.length ? pool[Math.floor(Math.random() * Math.min(pool.length, 5))] : null;
-  }
-
   function pickNextQuestion() {
+    const now = Date.now();
     const active = allQuestions.filter(q => !q.learned);
     if (!active.length) { alert("Test için arşivinde çalışılacak en az bir spot olmalı."); return null; }
-    const due = pickDue();
-    if (due) return due;
-    if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
-    const pool = [...active].sort((a, b) => a.nextReview - b.nextReview);
+    let pool = active.filter(q => q.nextReview <= now).sort((a, b) => a.nextReview - b.nextReview);
+    if (!pool.length) {
+      if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
+      pool = [...active].sort((a, b) => a.nextReview - b.nextReview);
+    }
     return pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
   }
 
-  function buildQuizPrompt(q) {
-    return `
-Sen bir TUS soru yazarısın. Kullanıcının daha önce takıldığı şu spot bilgiyi ölçen, orijinal TUS formatında, 5 şıklı (A, B, C, D, E) klinik bir vaka sorusu yaz:
-Branş/Konu: ${q.branch} - ${q.topic} (${q.subTopic || ""})
-Spot Bilgi: ${q.keyTakeaway}
-Detay: ${q.aiExplanation}
-
-Sadece aşağıdaki JSON formatında yanıt ver:
-{
-  "question": "Klinik vaka sorusu metni",
-  "options": { "A": "A şıkkı", "B": "B şıkkı", "C": "C şıkkı", "D": "D şıkkı", "E": "E şıkkı" },
-  "answer": "Doğru şık harfi (Sadece A, B, C, D veya E)",
-  "explanation": "Kısa ve net çözüm açıklaması"
-}
-    `;
-  }
-
-  async function fetchQuizData(q) {
-    const text = await callWorker({ prompt: buildQuizPrompt(q), model: currentModel });
-    const d = extractCleanJSON(text);
-    if (!d || typeof d.question !== "string" || !d.options || typeof d.answer !== "string") {
-      throw new Error("Soru biçimi geçersiz, tekrar dene.");
-    }
-    return d;
-  }
-
-  // Sıradaki soruyu sen mevcut soruyla uğraşırken arka planda üretir
-  function startPrefetch() {
-    if (nextPrefetch) return;
-    const q = pickDue(activeQuizQuestion?.id);
-    if (!q) return;
-    nextPrefetch = {
-      q,
-      promise: fetchQuizData(q).catch(err => { console.error("Önceden üretim hatası:", err); return null; })
-    };
-  }
-
+  // >>> HIZ OPTİMİZASYONU YAPILMIŞ VE ÇÖKME KORUMALI TEST ÜRETİCİ <<<
   window.generateQuiz = async () => {
-    if (quizBusy) return;
-
-    let picked = null, pending = null;
-    const cached = nextPrefetch;
-    nextPrefetch = null;
-    const live = cached ? allQuestions.find(q => q.id === cached.q.id && !q.learned) : null;
-    if (live) {
-      picked = live;
-      pending = cached.promise;
-    } else {
-      picked = pickNextQuestion();
-      if (!picked) return;
-    }
-
-    quizBusy = true;
+    const picked = pickNextQuestion();
+    if (!picked) return;
     activeQuizQuestion = picked;
-    currentQuizData = null;
 
     const btn = $("newQuizBtn");
     btn.disabled = true; btn.textContent = "Soru hazırlanıyor…";
+
     $("quizContainer").classList.remove("hidden");
-    $("quizQuestion").textContent = "Spot bilgiden yeni bir vaka sorusu hazırlanıyor…";
+    $("quizQuestion").textContent = "Spot bilgiden kısa ve net bir vaka sorusu hazırlanıyor…";
     $("quizOptions").innerHTML = "";
     $("quizResult").classList.add("hidden");
     $("quizSubBadge").textContent = [picked.branch, picked.topic].filter(Boolean).join(", ");
     $("quizStreakBadge").textContent = `Seviye ${picked.box}/5`;
 
+    // Prompt çok kısaltıldı, LLM'den uzun açıklamalar yapmaması istendi (Hız artışı için)
+    const prompt = `Görevin: Aşağıdaki TUS spot bilgisini test eden KISA ve NET bir klinik vaka sorusu yaz. Hızlı üretmen için laf kalabalığı yapma.
+Konu: ${picked.branch} - ${picked.topic}
+Spot Bilgi: ${picked.keyTakeaway}
+
+SADECE ŞU JSON FORMATINDA DÖN:
+{
+  "question": "Kısa klinik vaka metni",
+  "options": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
+  "answer": "A",
+  "explanation": "1 cümlelik çok net çözüm"
+}`;
+
     try {
-      let data = pending ? await pending : null;
-      if (!data) data = await fetchQuizData(picked);   // hazır soru yoksa ya da başarısızsa taze üret
-      currentQuizData = data;
-      $("quizQuestion").textContent = data.question;
+      const text = await callWorker({ prompt, model: currentModel });
+      currentQuizData = extractCleanJSON(text);
+
+      // --- CRASH KORUMASI: Eğer kota dolduysa sistemi çökertmeden ekrana bas ---
+      if (currentQuizData.branch === "SİSTEM MESAJI" || currentQuizData.branch === "API HATASI" || currentQuizData.branch === "Kota Doldu") {
+          throw new Error((currentQuizData.keyTakeaway || "") + " " + (currentQuizData.explanation || "API Kotası Hatası"));
+      }
+      if (!currentQuizData.options) {
+          throw new Error("Yapay zeka şıkları oluşturamadı, lütfen tekrar deneyin.");
+      }
+
+      $("quizQuestion").textContent = currentQuizData.question || "Soru metni alınamadı.";
       const oc = $("quizOptions");
       oc.innerHTML = "";
-      Object.entries(data.options).forEach(([key, val]) => {
+      
+      let opts = currentQuizData.options;
+      if (Array.isArray(opts)) {
+         const newOpts = {};
+         opts.forEach((o, i) => {
+            const k = String.fromCharCode(65 + i);
+            newOpts[k] = typeof o === 'object' ? Object.values(o)[0] : o;
+         });
+         opts = newOpts;
+      }
+
+      Object.entries(opts).forEach(([key, val]) => {
         const b = document.createElement("button");
         b.className = "opt"; b.dataset.key = key;
         b.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
         b.onclick = () => handleQuizSelection(key, b);
         oc.appendChild(b);
       });
-      startPrefetch();
     } catch (err) {
       console.error("Quiz üretim hatası:", err);
       $("quizQuestion").textContent = "Soru üretilemedi: " + err.message;
+      $("quizOptions").innerHTML = ""; 
     } finally {
-      quizBusy = false;
       btn.disabled = false; btn.textContent = "Soru getir";
     }
   };
 
-  // Sonucu hemen gösterir, kaydı arka planda yapar
-  function handleQuizSelection(selectedKey, clickedBtn) {
+  async function handleQuizSelection(selectedKey, clickedBtn) {
     if (!currentQuizData || !activeQuizQuestion) return;
-    const q = activeQuizQuestion;
     const btns = document.querySelectorAll("#quizOptions .opt");
     btns.forEach(b => b.disabled = true);
 
-    const correctKey = currentQuizData.answer.trim().toUpperCase().charAt(0);
+    const correctKey = String(currentQuizData.answer || "A").trim().toUpperCase().charAt(0);
     const isCorrect = selectedKey === correctKey;
     clickedBtn.classList.add(isCorrect ? "right" : "wrong");
     if (!isCorrect) btns.forEach(b => { if (b.dataset.key === correctKey) b.classList.add("right"); });
 
-    // Yeni durumu hesapla
-    let update, note;
-    if (isCorrect) {
-      const newBox = (q.box || 0) + 1;
-      if (newBox >= 5) {
-        update = { box: 5, learned: true, nextReview: Date.now() + 90 * DAY };
-        note = "Tüm tekrar aşamalarını geçtin. Spot Öğrenilen bölümüne taşındı.";
-      } else {
-        const days = INTERVAL_DAYS[newBox - 1];
-        update = { box: newBox, nextReview: Date.now() + days * DAY };
-        note = `Seviye ${newBox}/5. Bu spot ${days} gün sonra tekrar sorulacak.`;
-      }
-    } else {
-      update = { box: 0, nextReview: Date.now() };
-      note = "Spot Seviye 0'a döndü ve kısa sürede tekrar karşına çıkacak.";
-    }
+    const qRef = doc(db, COL, activeQuizQuestion.id);
+    const oldBox = activeQuizQuestion.box || 0;
+    let note = "";
 
-    // Ekranı ve yerel listeyi anında güncelle
-    Object.assign(q, update);
-    const live = allQuestions.find(x => x.id === q.id);
-    if (live && live !== q) Object.assign(live, update);
-    refreshAll();
+    try {
+      if (isCorrect) {
+        const newBox = oldBox + 1;
+        if (newBox >= 5) {
+          await updateDoc(qRef, { box: 5, learned: true, nextReview: Date.now() + 90 * DAY });
+          note = "Tüm tekrar aşamalarını geçtin. Spot Öğrenilen bölümüne taşındı.";
+        } else {
+          const days = INTERVAL_DAYS[newBox - 1];
+          await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });
+          note = `Seviye ${newBox}/5. Bu spot ${days} gün sonra tekrar sorulacak.`;
+        }
+      } else {
+        await updateDoc(qRef, { box: 0, nextReview: Date.now() });
+        note = "Spot Seviye 0'a döndü ve kısa sürede tekrar karşına çıkacak.";
+      }
+      await loadUserQuestions();
+    } catch (e) { console.error("Güncellenemedi:", e); }
 
     const res = $("quizResult");
     res.className = isCorrect ? "right" : "wrong";
     $("quizResultTitle").textContent = isCorrect ? `Doğru, cevap ${correctKey}` : `Yanlış, doğru cevap ${correctKey}`;
     $("quizNote").textContent = note;
     $("quizExplanation").innerHTML = fmt(currentQuizData.explanation);
+    res.classList.remove("hidden");
     res.scrollIntoView({ behavior: "smooth", block: "nearest" });
-
-    // Firestore kaydı arka planda
-    updateDoc(doc(db, COL, q.id), update).catch(err => {
-      console.error("Güncellenemedi:", err);
-      showToast("Cevap kaydedilemedi, bağlantını kontrol et", null);
-    });
   }
 </script>
 </body>

@@ -468,7 +468,7 @@
     btn.disabled = true; btn.textContent = "Analiz ediliyor…";
     if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
 
-    const prompt = `
+      const prompt = `
 Sen uzman bir TUS (Tıpta Uzmanlık Sınavı) hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
 Cevabı KESİNLİKLE sadece aşağıdaki geçerli JSON formatında ver, dışına hiçbir açıklama ekleme:
 {
@@ -476,10 +476,11 @@ Cevabı KESİNLİKLE sadece aşağıdaki geçerli JSON formatında ver, dışın
   "topic": "Konu Başlığı (Örn: Hematoloji)",
   "subTopic": "Alt Konu (Örn: G6PD Eksikliği / Favizm)",
   "keyTakeaway": "TUS'ta soru yaptıracak 1-2 cümlelik çok net, vurucu SPOT bilgi",
-  "explanation": "Sorunun detaylı patofizyolojik çözümü, doğru cevabın mekanizması ve çeldirici şıkların neden yanlış olduğunun net analizi"
+  "explanation": "Bir öğrenciye anlatır gibi, sade ve akıcı Türkçe ile yaz. Önce olayın mantığını 1-2 cümlede özetle, sonra mekanizmayı adım adım açıkla (neden böyle oluyor?), en sonda çeldirici şıkların neden yanlış olduğunu kısaca belirt. Gereksiz süs ve tekrar yapma, önemli terimleri **kalın** yaz. En fazla 8-10 cümle."
 }
 Kullanıcı Notu / Soru Metni: ${questionText}
     `;
+    
 
     try {
       const text = await callWorker({ prompt, model: currentModel, imageBase64: selectedImageBase64, mimeType: selectedImageMime });

@@ -491,6 +491,7 @@ Kullanıcı Notu / Soru Metni: ${questionText}
         const dup = findDuplicate(parsed);
         let doSave = true;
         if (dup) doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
+        
         if (doSave) {
           await addDoc(collection(db, COL), {
             branch: parsed.branch || "Genel",
@@ -503,6 +504,25 @@ Kullanıcı Notu / Soru Metni: ${questionText}
             createdAtMs: Date.now()
           });
           saved = true;
+
+          // YENİ EKLEME: TELEGRAM BOTA DA GÖNDER
+          try {
+            const botApiUrl = "https://tus-telegram-bot.medetarikurt.workers.dev";
+            await fetch(botApiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "save_web_question",
+                data: {
+                  branch: parsed.branch || "Genel",
+                  keyTakeaway: parsed.keyTakeaway || "",
+                  aiExplanation: parsed.explanation || ""
+                }
+              })
+            });
+          } catch (e) { console.log("Telegram bota giderken hata:", e); }
+          // YENİ EKLEME BİTİŞİ
+          
         }
       }
 

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -154,6 +155,9 @@
     #quizResult.wrong #quizResultTitle { color: var(--bad); }
     #quizNote { margin-top: 4px; font-size: 14px; color: var(--muted); }
     #quizExplanation { margin: 10px 0 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
+    #quizAskBox { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
+    #quizAskInput { width: 100%; min-height: 82px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--raised); }
+    #quizAskAnswer { margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--raised); white-space: pre-wrap; line-height: 1.6; }
 
     nav {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
@@ -261,6 +265,12 @@
           <p id="quizExplanation"></p>
           <button id="nextQuizBtn" class="btn" onclick="nextQuiz()">Sıradaki soru</button>
         </div>
+        <div id="quizAskBox" class="stack">
+          <h3 class="card-title">Bu soru hakkında asistana sor</h3>
+          <textarea id="quizAskInput" placeholder="Örn: Ferritin neden bu kadar yükseliyor? Bu tanıda fibrinojen neden düşer?"></textarea>
+          <button id="quizAskBtn" class="btn" onclick="askQuizAssistant()">Asistana sor</button>
+          <div id="quizAskAnswer" class="hidden" aria-live="polite"></div>
+        </div>
       </div>
     </section>
 
@@ -304,7 +314,7 @@
   const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
   const BOT_API_URL = "https://tus-telegram-bot.medetarikurt.workers.dev";
   const COL = "tus_questions";
-  const MAX_STREAK = 3; // 3 kez bilince öğrenilenlere taşır
+  const MAX_STREAK = 3; // 3 kez bilince tamamen siler
   const INTERVAL_DAYS = [1, 3];
   const DAY = 86400000;
 
@@ -318,6 +328,7 @@
   let selectedBranchFilter = "All";
   let selectedStatus = "active";
   let activeQuizQuestion = null, currentQuizData = null;
+  let quizUserAnswer = null;
   let analyzing = false;
 
   let quizQueue = [], quizIndex = 0;
@@ -822,77 +833,108 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     return opts;
   }
 
+  function separateQuestionOptions(question, options) {
+    let stem = String(question || "").trim();
+    let opts = normalizeOptions(options) || {};
+    const markers = [...stem.matchAll(/\b([A-E])[).]\s*/g)];
+
+    // Model seçenekleri soru metnine de koyduysa, soru kökünden ayır.
+    if (markers.length >= 5 && markers.slice(0, 5).map(m => m[1]).join("") === "ABCDE") {
+      const first = markers[0].index;
+      const inline = {};
+      for (let i = 0; i < 5; i++) {
+        const start = markers[i].index + markers[i][0].length;
+        const end = i < 4 ? markers[i + 1].index : stem.length;
+        inline[markers[i][1]] = stem.slice(start, end).trim();
+      }
+      stem = stem.slice(0, first).trim();
+      if (!Object.keys(opts).length || Object.keys(opts).length < 5) opts = inline;
+    }
+    return { question: stem, options: opts };
+  }
+
   function showQuizQuestion() {
-    const { src, data } = quizQueue[quizIndex];
-    activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
-    currentQuizData = data;
+  const { src, data } = quizQueue[quizIndex];
+  activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
+  currentQuizData = data;
+  quizUserAnswer = null;
+  $("quizAskInput").value = "";
+  $("quizAskAnswer").textContent = "";
+  $("quizAskAnswer").classList.add("hidden");
+  $("quizAskBtn").disabled = false;
+  $("quizAskBtn").textContent = "Asistana sor";
 
-    $("quizResult").classList.add("hidden");
-    $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
-    $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box || 0}/${MAX_STREAK}`;
-    $("quizQuestion").textContent = data.question;
-    $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
+  const separated = separateQuestionOptions(data.question, data.options);
+  data.question = separated.question;
+  data.options = separated.options;
 
-    const optionsContainer = $("quizOptions");
-    optionsContainer.innerHTML = "";
+  $("quizResult").classList.add("hidden");
+  $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
+  $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/${MAX_STREAK}`;
+  $("quizQuestion").textContent = data.question;
+  $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
 
-    Object.entries(data.options).forEach(([key, val]) => {
-      const button = document.createElement("button");
-      button.className = "opt";
-      button.dataset.key = key;
-      button.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
-      button.onclick = () => handleQuizSelection(key, button);
-      optionsContainer.appendChild(button);
-    });
+  const oc = $("quizOptions");
+  oc.innerHTML = "";
 
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "link danger";
-    deleteButton.textContent = "🗑️ Bu spotu sil";
-    deleteButton.style.marginTop = "12px";
-    deleteButton.onclick = deleteActiveQuizSpot;
-    optionsContainer.appendChild(deleteButton);
+  Object.entries(data.options).forEach(([key, val]) => {
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.dataset.key = key;
+    b.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
+    b.onclick = () => handleQuizSelection(key, b);
+    oc.appendChild(b);
+  });
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "link danger";
+  delBtn.textContent = "🗑️ Bu spotu sil";
+  delBtn.style.marginTop = "12px";
+  delBtn.onclick = deleteActiveQuizSpot;
+  oc.appendChild(delBtn);
+} async function deleteActiveQuizSpot() {
+  if (!activeQuizQuestion) return;
+
+  const q = activeQuizQuestion;
+
+  if (!confirm("Bu spot hem web arşivinden hem Telegram'dan kalıcı olarak silinsin mi?")) return;
+
+  const btn = document.querySelector("#quizOptions button.link.danger");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Siliniyor...";
   }
 
-  async function deleteActiveQuizSpot() {
-    if (!activeQuizQuestion) return;
+  try {
+    await deleteDoc(doc(db, COL, q.id));
+    await deleteFromTelegramBot(q.keyTakeaway);
 
-    const question = activeQuizQuestion;
-    if (!confirm("Bu spot web arşivinden ve Telegram botundan silinsin mi?")) return;
+    allQuestions = allQuestions.filter(x => x.id !== q.id);
+    quizQueue.splice(quizIndex, 1);
 
-    const deleteButton = document.querySelector("#quizOptions button.link.danger");
-    if (deleteButton) {
-      deleteButton.disabled = true;
-      deleteButton.textContent = "Siliniyor...";
+    await loadUserQuestions();
+
+    if (quizQueue.length > 0) {
+      quizIndex = Math.min(quizIndex, quizQueue.length - 1);
+      showQuizQuestion();
+    } else {
+      activeQuizQuestion = null;
+      currentQuizData = null;
+      $("quizQuestion").textContent = "Bu sette başka spot kalmadı. Yeni set getirebilirsin.";
+      $("quizOptions").innerHTML = "";
+      $("quizResult").classList.add("hidden");
+      $("nextQuizBtn").textContent = "Yeni set getir";
     }
 
-    try {
-      await deleteDoc(doc(db, COL, question.id));
-      await deleteFromTelegramBot(question.keyTakeaway);
-
-      allQuestions = allQuestions.filter(item => item.id !== question.id);
-      quizQueue.splice(quizIndex, 1);
-      await loadUserQuestions();
-
-      if (quizQueue.length > 0) {
-        quizIndex = Math.min(quizIndex, quizQueue.length - 1);
-        showQuizQuestion();
-      } else {
-        activeQuizQuestion = null;
-        currentQuizData = null;
-        $("quizQuestion").textContent = "Bu sette başka spot kalmadı. Yeni set getirebilirsin.";
-        $("quizOptions").innerHTML = "";
-        $("quizResult").classList.add("hidden");
-        $("nextQuizBtn").textContent = "Yeni set getir";
-      }
-    } catch (error) {
-      console.error("Spot silme hatası:", error);
-      alert("Web arşivinden silme sırasında hata oluştu. Sayfayı yenileyip tekrar dene.");
-      if (deleteButton) {
-        deleteButton.disabled = false;
-        deleteButton.textContent = "🗑️ Bu spotu sil";
-      }
+  } catch (err) {
+    console.error("Spot silme hatası:", err);
+    alert("Silme sırasında hata oluştu.");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🗑️ Bu spotu sil";
     }
   }
+}
 
   window.nextQuiz = () => {
     if (quizIndex + 1 < quizQueue.length) {
@@ -921,32 +963,23 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
     const spots = picked.map((q, i) => `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`).join("\n");
    
-const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, GERÇEK TUS SINAVI ZORLUĞUNDA klinik vaka sorusu hazırla.
+const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, gerçek TUS zorluğunda klinik vaka sorusu hazırla.
 
-SORU HAZIRLAMA KURALLARI:
-1. Sorular orta-zor ve zor seviyede olsun. Kolay, doğrudan ezber sorusu yazma.
-2. Her soru klinik bir senaryo içersin. Anamnez, fizik muayene ve gerekli laboratuvar bulgularını kullan.
-3. Spot bilgisini doğrudan sorma. Öğrencinin bu bilgiyi klinik vakaya uygulamasını gerektir.
-4. Birbirine yakın ve güçlü çeldiriciler oluştur. Yanlış seçenekler de tıbben makul olsun.
-5. Tanı, ayırıcı tanı, patofizyoloji, farmakoloji, komplikasyon ve tedavi mekanizmalarını uygun spotlarda ölç.
-6. Gereksiz ve gerçek dışı ayrıntılarla vakayı uzatma.
-7. Her soruda yalnızca bir kesin doğru cevap olsun.
-8. Sorular birbirini tekrar etmesin.
-9. Spotta bulunmayan bilgiyi sorunun temel cevabı haline getirme.
-10. TUS'taki gibi dikkatli klinik yorum gerektiren sorular hazırla.
+KURALLAR:
+- Her soru orta-zor veya zor düzeyde, klinik vaka temelli olsun.
+- Anamnez, muayene ve gerektiğinde laboratuvar bulguları kullan.
+- Güçlü ve tıbben makul çeldiriciler oluştur; yalnızca bir doğru seçenek olsun.
+- Her spot için bir soru üret ve spotların sırasını koru.
+- "question" alanına yalnızca vaka ve soru kökünü yaz. A, B, C, D, E seçeneklerini kesinlikle question alanına ekleme; yalnızca options nesnesine yaz.
+- "explanation" alanında yalnızca doğru cevabın neden doğru olduğunu 2-3 kısa cümleyle açıkla. Yanlış seçenekleri tek tek açıklama, A-E seçeneklerini ayrı ayrı değerlendirme.
+- Açıklamanın sonunda gerekiyorsa tek bir kritik TUS bilgisini vurgula.
 
-ÇÖZÜM KURALLARI:
-- Doğru cevabın neden doğru olduğunu açıkla.
-- Diğer dört seçeneğin neden yanlış olduğunu ayrı ayrı kısaca açıkla.
-- Sorunun ölçtüğü kritik TUS bilgisini en sonda belirt.
-- Cevap anahtarı kesin ve tutarlı olsun.
-
-SADECE GEÇERLİ JSON DÖNDÜR:
+SADECE aşağıdaki yapıda geçerli JSON döndür:
 {
   "questions": [
     {
       "no": 1,
-      "question": "Klinik vaka ve soru metni",
+      "question": "Klinik vaka ve soru kökü; seçenekler burada bulunmayacak",
       "options": {
         "A": "Seçenek A",
         "B": "Seçenek B",
@@ -955,14 +988,13 @@ SADECE GEÇERLİ JSON DÖNDÜR:
         "E": "Seçenek E"
       },
       "answer": "A",
-      "explanation": "Doğru cevabın gerekçesi. A-E seçeneklerinin neden doğru veya yanlış olduğunun açıklaması. Kritik TUS bilgisi."
+      "explanation": "Doğru cevabın kısa gerekçesi ve kritik TUS bilgisi."
     }
   ]
 }
 
 Spotlar:
 ${spots}`;
-
 
     try {
       const text = await callWorker({ prompt, model: currentModel });
@@ -975,11 +1007,12 @@ ${spots}`;
       const arr = Array.isArray(data) ? data : (Array.isArray(data.questions) ? data.questions : []);
       quizQueue = [];
       arr.forEach((item, idx) => {
-        const opts = normalizeOptions(item.options);
-        if (!item.question || !opts) return;
+        const separated = separateQuestionOptions(item.question, item.options);
+        const opts = separated.options;
+        if (!separated.question || !opts || Object.keys(opts).length < 5) return;
         const src = picked[(Number(item.no) || idx + 1) - 1] || picked[idx];
         if (!src) return;
-        quizQueue.push({ src, data: { ...item, options: opts } });
+        quizQueue.push({ src, data: { ...item, question: separated.question, options: opts } });
       });
 
       if (!quizQueue.length) throw new Error("Yapay zeka soruları oluşturamadı, tekrar dene.");
@@ -1000,6 +1033,7 @@ ${spots}`;
     btns.forEach(b => b.disabled = true);
 
     const correctKey = String(currentQuizData.answer || "A").trim().toUpperCase().charAt(0);
+    quizUserAnswer = selectedKey;
     const isCorrect = selectedKey === correctKey;
     clickedBtn.classList.add(isCorrect ? "right" : "wrong");
     if (!isCorrect) btns.forEach(b => { if (b.dataset.key === correctKey) b.classList.add("right"); });
@@ -1020,7 +1054,7 @@ ${spots}`;
 
   await deleteFromTelegramBot(activeQuizQuestion.keyTakeaway);
 
-  note = `🔥 ${MAX_STREAK}/${MAX_STREAK} tamamlandı! Bu spot öğrenildi ve web arşivindeki Öğrenilenler bölümüne taşındı. Telegram'dan silinmesi için istek gönderildi.`;
+  note = `🔥 ${MAX_STREAK}/${MAX_STREAK} tamamlandı! Bu spotu öğrendin. Telegram'dan silindi ve web arşivindeki Öğrenilenler bölümüne taşındı.`;
 } else {
           const days = INTERVAL_DAYS[newBox - 1] || 3;
           await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });
@@ -1041,6 +1075,38 @@ ${spots}`;
     res.classList.remove("hidden");
     res.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+
+  window.askQuizAssistant = async () => {
+    const questionText = $("quizAskInput").value.trim();
+    if (!questionText || !currentQuizData) return;
+
+    const btn = $("quizAskBtn");
+    const answerBox = $("quizAskAnswer");
+    btn.disabled = true;
+    btn.textContent = "Yanıt hazırlanıyor…";
+    answerBox.classList.remove("hidden");
+    answerBox.textContent = "Asistan düşünüyor…";
+
+    const optionsText = Object.entries(currentQuizData.options || {})
+      .map(([key, value]) => `${key}) ${value}`).join("\n");
+    const answered = quizUserAnswer !== null;
+    const context = `Soru: ${currentQuizData.question}\nSeçenekler:\n${optionsText}` +
+      (answered ? `\nKullanıcının işaretlediği cevap: ${quizUserAnswer}\nDoğru cevap: ${currentQuizData.answer}\nÇözüm: ${currentQuizData.explanation || ""}` : "");
+
+    const prompt = `Sen TUS hazırlık asistanısın. Aşağıdaki soru hakkında kullanıcının sorusunu yanıtla. Türkçe, anlaşılır ve öğretici ol. Gereksiz uzatma; gerekirse mekanizmayı ve klinik mantığı açıkla. Kullanıcı özellikle istemedikçe diğer seçenekleri tek tek değerlendirme. Kullanıcı henüz cevaplamadıysa doğru cevabı kendiliğinden açıklama; doğrudan sorarsa açıklayabilirsin.\n\n${context}\n\nKullanıcının sorusu: ${questionText}\n\nSADECE şu JSON formatında yanıt ver: {"answer":"Yanıtın"}`;
+
+    try {
+      const raw = await callWorker({ prompt, model: currentModel });
+      const parsed = parseBatch(raw);
+      const answer = typeof parsed.answer === "string" ? parsed.answer : "Yanıt okunamadı. Lütfen tekrar dene.";
+      answerBox.textContent = answer;
+    } catch (err) {
+      answerBox.textContent = "Yanıt alınamadı: " + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Tekrar sor";
+    }
+  };
 
   setQuizCount(quizCount);
 </script>

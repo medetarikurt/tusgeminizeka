@@ -94,7 +94,7 @@
     .seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
 
     textarea {
-      width: 100%; min-height: 92px; resize: vertical; display: block;
+      width: 100%; min-height: 120px; resize: vertical; display: block;
       background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 16px;
     }
     textarea::placeholder { color: var(--muted); }
@@ -118,11 +118,12 @@
     .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
     .result-head h3 { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.3; }
     .stack > * + * { margin-top: 14px; }
+    .batch-divider { border: 0; border-top: 2px dashed var(--line); margin: 20px 0; }
 
     .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 1px 0; }
     .chips::-webkit-scrollbar { display: none; }
     .chip { white-space: nowrap; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
-    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 650; }
     #questionsList { display: grid; gap: 12px; }
     .item-title { font-weight: 650; line-height: 1.3; }
     .item-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -204,7 +205,7 @@
             <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
           </label>
         </div>
-        <div class="hint">Fotoğraf seçilince otomatik analize başlar.</div>
+        <div class="hint">Fotoğraf seçip üzerine not ekleyebilirsin.</div>
 
         <div id="imagePreviewContainer" class="hidden">
           <img id="imagePreview" alt="Seçilen soru görseli">
@@ -214,25 +215,12 @@
       </div>
 
       <div class="card stack">
-        <h2 class="card-title">Metinle ekle</h2>
-        <textarea id="questionInput" rows="3" placeholder="Soruyu yaz ya da fotoğrafa not ekle. Örnek: C şıkkını anlamadım."></textarea>
+        <h2 class="card-title">Metin veya toplu not ekle</h2>
+        <textarea id="questionInput" rows="4" placeholder="Tek bir soru yaz, fotoğrafa not ekle ya da PDF'ten kopyaladığın uzun ders notlarını buraya yapıştır. Uzun metinlerdeki tüm spotlar otomatik olarak tek tek ayıklanıp kaydedilir."></textarea>
         <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()">Analiz et ve kaydet</button>
       </div>
 
-      <div id="resultCard" class="card stack hidden">
-        <div class="result-head">
-          <div>
-            <h3 id="resSubBadge">Konu</h3>
-            <div class="meta" id="resBadge">Branş</div>
-          </div>
-          <span id="resSaved" class="meta">Kaydedildi</span>
-        </div>
-        <div class="spot" id="resKeyTakeaway"></div>
-        <div>
-          <div class="label">Çözüm ve patofizyoloji</div>
-          <div id="resExplanation" class="reading pre"></div>
-        </div>
-      </div>
+      <div id="resultCard" class="card stack hidden"></div>
     </section>
 
     <section id="sectionArchive" class="hidden">
@@ -314,6 +302,7 @@
     measurementId: "G-9SC3CQ1771"
   };
   const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
+  const BOT_API_URL = "https://tus-telegram-bot.medetarikurt.workers.dev";
   const COL = "tus_questions";
   const INTERVAL_DAYS = [1, 3, 7, 21];
   const DAY = 86400000;
@@ -330,7 +319,6 @@
   let activeQuizQuestion = null, currentQuizData = null;
   let analyzing = false;
 
-  // Toplu test: üretilen soruların kuyruğu ve seçili soru sayısı
   let quizQueue = [], quizIndex = 0;
   let quizCount = parseInt(localStorage.getItem("tus_quiz_count") || "5", 10);
   if (![1, 3, 5, 10].includes(quizCount)) quizCount = 5;
@@ -370,8 +358,15 @@
 
   function extractCleanJSON(raw) {
     const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
-    if (a !== -1 && b !== -1) return JSON.parse(cleaned.substring(a, b + 1));
+    try { return JSON.parse(cleaned); } catch (e) {}
+    const aObj = cleaned.indexOf("{"), bObj = cleaned.lastIndexOf("}");
+    const aArr = cleaned.indexOf("["), bArr = cleaned.lastIndexOf("]");
+    if (aArr !== -1 && bArr !== -1 && (aObj === -1 || aArr < aObj)) {
+      return JSON.parse(cleaned.substring(aArr, bArr + 1));
+    }
+    if (aObj !== -1 && bObj !== -1) {
+      return JSON.parse(cleaned.substring(aObj, bObj + 1));
+    }
     return JSON.parse(cleaned);
   }
 
@@ -410,7 +405,6 @@
     $("modelPro").classList.toggle("on", isPro);
   };
 
-  // Fotoğraf seçilince otomatik analiz etmez, sadece ekrana basar. Sen butona basarsın.
   window.handleImageSelect = (event) => {
     const file = event.target.files[0];
     if (!file || analyzing) return;
@@ -454,8 +448,8 @@
   function findDuplicate(p) {
     const sub = (p.subTopic || "").trim().toLowerCase();
     return allQuestions.find(q =>
-      (sub && (q.subTopic || "").trim().toLowerCase() === sub && q.branch === p.branch) ||
-      similarity(q.keyTakeaway, p.keyTakeaway) >= 0.55);
+      (sub && (q.subTopic || "").trim().toLowerCase() === sub && q.branch === p.branch && similarity(q.keyTakeaway, p.keyTakeaway) >= 0.45) ||
+      similarity(q.keyTakeaway, p.keyTakeaway) >= 0.60);
   }
 
   window.analyzeAndSaveQuestion = async () => {
@@ -468,75 +462,127 @@
     btn.disabled = true; btn.textContent = "Analiz ediliyor…";
     if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
 
-      const prompt = `
-Sen uzman bir TUS (Tıpta Uzmanlık Sınavı) hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
+    const prompt = `
+Sen uzman bir TUS (Tıpta Uzmanlık Sınavı) hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu, ders notunu veya uzun metni analiz etmek.
+- Eğer tek bir soru veya kısa bir not verilmişse listede 1 eleman döndür.
+- Eğer uzun bir ders notu, tablo, maddeler veya birden fazla bilgi içeren bir metin verilmişse, metindeki TUS açısından değerli TÜM ayrı spot bilgileri tek tek ayıkla ve "items" dizisi içinde ayrı elemanlar olarak döndür (en fazla 15 adet).
+
 Cevabı KESİNLİKLE sadece aşağıdaki geçerli JSON formatında ver, dışına hiçbir açıklama ekleme:
 {
-  "branch": "Branş Adı (Sadece şunlardan biri: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
-  "topic": "Konu Başlığı (Örn: Hematoloji)",
-  "subTopic": "Alt Konu (Örn: G6PD Eksikliği / Favizm)",
-  "keyTakeaway": "TUS'ta soru yaptıracak 1-2 cümlelik çok net, vurucu SPOT bilgi",
-  "explanation": "Bir öğrenciye anlatır gibi, sade ve akıcı Türkçe ile yaz. Önce olayın mantığını 1-2 cümlede özetle, sonra mekanizmayı adım adım açıkla (neden böyle oluyor?), en sonda çeldirici şıkların neden yanlış olduğunu kısaca belirt. Gereksiz süs ve tekrar yapma, önemli terimleri **kalın** yaz. En fazla 8-10 cümle."
+  "items": [
+    {
+      "branch": "Branş Adı (Sadece şunlardan biri: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+      "topic": "Konu Başlığı (Örn: Hematoloji)",
+      "subTopic": "Alt Konu (Örn: G6PD Eksikliği / Favizm)",
+      "keyTakeaway": "TUS'ta soru yaptıracak 1-2 cümlelik çok net, vurucu SPOT bilgi",
+      "explanation": "Bir öğrenciye anlatır gibi, sade ve akıcı Türkçe ile yaz. Önce olayın mantığını 1-2 cümlede özetle, sonra mekanizmayı adım adım açıkla (neden böyle oluyor?), varsa çeldirici noktaları veya ayırıcı tanıyı kısaca belirt. Gereksiz süs ve tekrar yapma, önemli terimleri **kalın** yaz. En fazla 6-8 cümle."
+    }
+  ]
 }
 Kullanıcı Notu / Soru Metni: ${questionText}
     `;
-    
 
     try {
       const text = await callWorker({ prompt, model: currentModel, imageBase64: selectedImageBase64, mimeType: selectedImageMime });
-      const parsed = extractCleanJSON(text);
-      let saved = false;
-
-      if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI" && parsed.branch !== "Kota Doldu") {
-        const dup = findDuplicate(parsed);
-        let doSave = true;
-        if (dup) doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
-        
-        if (doSave) {
-          await addDoc(collection(db, COL), {
-            branch: parsed.branch || "Genel",
-            topic: parsed.topic || "Genel",
-            subTopic: parsed.subTopic || "",
-            rawQuestion: questionText || "Fotoğraflı TUS sorusu",
-            aiExplanation: parsed.explanation || "",
-            keyTakeaway: parsed.keyTakeaway || "",
-            box: 0, nextReview: Date.now(), learned: false, deleted: false,
-            createdAtMs: Date.now()
-          });
-          saved = true;
-
-          // YENİ EKLEME: TELEGRAM BOTA DA GÖNDER
-          try {
-            const botApiUrl = "https://tus-telegram-bot.medetarikurt.workers.dev";
-            await fetch(botApiUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "save_web_question",
-                data: {
-                  branch: parsed.branch || "Genel",
-                  keyTakeaway: parsed.keyTakeaway || "",
-                  aiExplanation: parsed.explanation || ""
-                }
-              })
-            });
-          } catch (e) { console.log("Telegram bota giderken hata:", e); }
-          // YENİ EKLEME BİTİŞİ
-          
-        }
+      const rawParsed = extractCleanJSON(text);
+      
+      let items = [];
+      if (Array.isArray(rawParsed)) {
+        items = rawParsed;
+      } else if (rawParsed && Array.isArray(rawParsed.items)) {
+        items = rawParsed.items;
+      } else if (rawParsed && rawParsed.branch) {
+        items = [rawParsed];
       }
 
-      $("resSaved").textContent = saved ? "Kaydedildi" : "Kaydedilmedi";
-      $("resBadge").textContent = [parsed.branch, parsed.topic].filter(Boolean).join(", ");
-      $("resSubBadge").textContent = parsed.subTopic || parsed.topic || "";
-      $("resKeyTakeaway").innerHTML = fmt(parsed.keyTakeaway || "");
-      $("resExplanation").innerHTML = fmt(parsed.explanation || "");
-      $("resultCard").classList.remove("hidden");
+      if (!items.length) throw new Error("Metinden geçerli bir spot çıkarılamadı.");
+
+      let savedCount = 0;
+      const resultHTMLs = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const parsed = items[i];
+        let itemSaved = false;
+
+        if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI" && parsed.branch !== "Kota Doldu") {
+          const dup = findDuplicate(parsed);
+          let doSave = true;
+
+          // Tekil eklemede benzerini sor, toplu eklemede (2+ spot) birebir kopyaları sessizce atla
+          if (dup) {
+            if (items.length === 1) {
+              doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
+            } else {
+              doSave = false;
+            }
+          }
+
+          if (doSave) {
+            btn.textContent = items.length > 1 ? `Kaydediliyor (${i + 1}/${items.length})…` : "Kaydediliyor…";
+            
+            await addDoc(collection(db, COL), {
+              branch: parsed.branch || "Genel",
+              topic: parsed.topic || "Genel",
+              subTopic: parsed.subTopic || "",
+              rawQuestion: questionText ? questionText.substring(0, 500) : "Fotoğraflı TUS sorusu",
+              aiExplanation: parsed.explanation || "",
+              keyTakeaway: parsed.keyTakeaway || "",
+              box: 0, nextReview: Date.now(), learned: false, deleted: false,
+              createdAtMs: Date.now() + i
+            });
+            itemSaved = true;
+            savedCount++;
+
+            // TELEGRAM BOTA GÖNDER
+            try {
+              await fetch(BOT_API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "save_web_question",
+                  data: {
+                    branch: parsed.branch || "Genel",
+                    keyTakeaway: parsed.keyTakeaway || "",
+                    aiExplanation: parsed.explanation || ""
+                  }
+                })
+              });
+              // Çoklu gönderimde Telegram rate-limit'e takılmamak için kısa bekleme
+              if (items.length > 1) await new Promise(r => setTimeout(r, 350));
+            } catch (e) { console.log("Telegram bota giderken hata:", e); }
+          }
+        }
+
+        resultHTMLs.push(`
+          <div class="stack">
+            <div class="result-head">
+              <div>
+                <h3>${esc(parsed.subTopic || parsed.topic || "Konu")}</h3>
+                <div class="meta">${esc([parsed.branch, parsed.topic].filter(Boolean).join(", "))}</div>
+              </div>
+              <span class="meta" style="color:${itemSaved ? 'var(--ok)' : 'var(--muted)'}">${itemSaved ? "✓ Kaydedildi" : "Atlandı (Mevcut)"}</span>
+            </div>
+            <div class="spot">${fmt(parsed.keyTakeaway || "")}</div>
+            <div>
+              <div class="label">Çözüm ve patofizyoloji</div>
+              <div class="reading pre">${fmt(parsed.explanation || "")}</div>
+            </div>
+          </div>
+        `);
+      }
+
+      const resCard = $("resultCard");
+      const summaryHeader = items.length > 1 
+        ? `<div style="font-weight:650; color:var(--accent); font-size:15px;">🎉 Toplam ${items.length} spot ayıklandı (${savedCount} tanesi yeni kaydedildi ve Telegram'a gönderildi)</div><hr class="batch-divider">`
+        : "";
+      
+      resCard.innerHTML = summaryHeader + resultHTMLs.join('<hr class="batch-divider">');
+      resCard.classList.remove("hidden");
 
       $("questionInput").value = "";
       clearImage();
       await loadUserQuestions();
-      $("resultCard").scrollIntoView({ behavior: "smooth", block: "start" });
+      resCard.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       console.error("Analiz hatası:", err);
       if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Lütfen tekrar dene.";
@@ -663,7 +709,6 @@ Kullanıcı Notu / Soru Metni: ${questionText}
     document.querySelectorAll("#countSeg button").forEach(b => b.classList.toggle("on", Number(b.dataset.n) === n));
   };
 
-  // Vadesi gelen spotlardan n tanesini seçer (her spot sette bir kez)
   function pickQuestions(n) {
     const now = Date.now();
     const active = allQuestions.filter(q => !q.learned);
@@ -768,7 +813,6 @@ SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
       const text = await callWorker({ prompt, model: currentModel });
       const data = parseBatch(text);
 
-      // Worker sistem mesajı döndürdüyse (kota vb.) çökmeden ekrana bas
       if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") {
         throw new Error((data.keyTakeaway || "") + " " + (data.explanation || ""));
       }
@@ -836,7 +880,6 @@ SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
     res.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  // Sayfa açılınca seçili soru sayısını işaretle
   setQuizCount(quizCount);
 </script>
 </body>

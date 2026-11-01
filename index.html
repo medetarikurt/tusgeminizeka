@@ -123,7 +123,7 @@
     .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 1px 0; }
     .chips::-webkit-scrollbar { display: none; }
     .chip { white-space: nowrap; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
-    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 650; }
     #questionsList { display: grid; gap: 12px; }
     .item-title { font-weight: 650; line-height: 1.3; }
     .item-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -251,7 +251,7 @@
       <div id="quizContainer" class="card stack hidden">
         <div class="bar">
           <span id="quizSubBadge" class="meta">Konu</span>
-          <span id="quizStreakBadge" class="meta">Seviye 0/5</span>
+          <span id="quizStreakBadge" class="meta">Seviye 0/3</span>
         </div>
         <p id="quizQuestion" class="quiz-q"></p>
         <div id="quizOptions"></div>
@@ -304,7 +304,8 @@
   const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
   const BOT_API_URL = "https://tus-telegram-bot.medetarikurt.workers.dev";
   const COL = "tus_questions";
-  const INTERVAL_DAYS = [1, 3, 7, 21];
+  const MAX_STREAK = 3; // 3 kez bilince tamamen siler
+  const INTERVAL_DAYS = [1, 3];
   const DAY = 86400000;
 
   const app = initializeApp(firebaseConfig);
@@ -356,7 +357,21 @@
     }
   }
 
-  // Yarıda kesilen JSON metinlerinden sağlam spot nesnelerini kurtaran fonksiyon
+  // Telegram botundan ve gruptan spotu silmek için istek atar
+  async function deleteFromTelegramBot(keyTakeaway) {
+    if (!keyTakeaway) return;
+    try {
+      await fetch(BOT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_web_question",
+          data: { keyTakeaway }
+        })
+      });
+    } catch (e) { console.log("Telegram silme hatası:", e); }
+  }
+
   function salvageTruncatedItems(rawStr) {
     const salvaged = [];
     const regex = /\{\s*"branch"\s*:\s*"[^"]+"[\s\S]*?"explanation"\s*:\s*"(?:[^"\\]|\\.)*"\s*\}/g;
@@ -388,7 +403,6 @@
     return JSON.parse(cleaned);
   }
 
-  // Uzun metinleri kelime sınırına (token limit) takılmaması için ~900 karakterlik anlamlı parçalara böler
   function splitTextIntoChunks(text, maxLen = 900) {
     if (!text || text.length <= maxLen) return [text];
     const lines = text.split(/\n+/);
@@ -498,7 +512,6 @@
     btn.disabled = true; btn.textContent = "Analiz ediliyor…";
     if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
 
-    // Fotoğraf yoksa ve metin uzunsa otomatik parçalara böl
     const chunks = selectedImageBase64 ? [questionText] : splitTextIntoChunks(questionText, 900);
     let allExtractedItems = [];
 
@@ -546,7 +559,6 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
         const rawParsed = extractCleanJSON(text);
 
         let chunkItems = [];
-        // Eğer Worker yanıt kesildi hatası döndürdüyse, explanation içindeki ham metinden sağlam spotları kurtar!
         if (rawParsed && rawParsed.branch === "SİSTEM MESAJI" && rawParsed.explanation) {
           const rescued = salvageTruncatedItems(rawParsed.explanation);
           if (rescued.length > 0) {
@@ -605,7 +617,6 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
             itemSaved = true;
             savedCount++;
 
-            // TELEGRAM BOTA GÖNDER
             try {
               await fetch(BOT_API_URL, {
                 method: "POST",
@@ -710,15 +721,12 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   window.deleteQuestion = async (docId) => {
     const q = allQuestions.find(x => x.id === docId);
     if (!q) return;
-    if (!confirm(`"${q.subTopic || q.topic || "Bu spot"}" silinsin mi?`)) return;
+    if (!confirm(`"${q.subTopic || q.topic || "Bu spot"}" hem web arşivinden hem de Telegram'dan kalıcı olarak silinsin mi?`)) return;
     try {
-      await updateDoc(doc(db, COL, docId), { deleted: true });
+      await deleteDoc(doc(db, COL, docId));
+      await deleteFromTelegramBot(q.keyTakeaway);
       allQuestions = allQuestions.filter(x => x.id !== docId);
       refreshAll();
-      showToast("Spot silindi", async () => {
-        await updateDoc(doc(db, COL, docId), { deleted: false });
-        await loadUserQuestions();
-      });
     } catch (err) { console.error("Silme hatası:", err); alert("Silinirken hata oluştu."); }
   };
 
@@ -759,7 +767,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
         </div>
         <div class="spot">${fmt(q.keyTakeaway)}</div>
         <div class="item-foot">
-          <span class="meta">Seviye ${q.box}/5, ${reviewLabel(q)}</span>
+          <span class="meta">Seviye ${q.box}/${MAX_STREAK}, ${reviewLabel(q)}</span>
           <div class="actions">
             ${q.learned ? `<button class="link" onclick="reactivateQuestion('${esc(q.id)}')">Tekrar aktif et</button>` : ""}
             <button class="link danger" onclick="deleteQuestion('${esc(q.id)}')">Sil</button>
@@ -821,7 +829,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
     $("quizResult").classList.add("hidden");
     $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + `  (${quizIndex + 1}/${quizQueue.length})`;
-    $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/5`;
+    $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/${MAX_STREAK}`;
     $("quizQuestion").textContent = data.question;
     $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
 
@@ -927,17 +935,18 @@ SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
     try {
       if (isCorrect) {
         const newBox = oldBox + 1;
-        if (newBox >= 5) {
-          await updateDoc(qRef, { box: 5, learned: true, nextReview: Date.now() + 90 * DAY });
-          note = "Tüm tekrar aşamalarını geçtin. Spot Öğrenilen bölümüne taşındı.";
+        if (newBox >= MAX_STREAK) {
+          await deleteDoc(qRef);
+          await deleteFromTelegramBot(activeQuizQuestion.keyTakeaway);
+          note = `🔥 3/${MAX_STREAK} tamamlandı! Bu spotu tamamen öğrendin; hem web arşivinden hem de Telegram'dan kalıcı olarak silindi.`;
         } else {
-          const days = INTERVAL_DAYS[newBox - 1];
+          const days = INTERVAL_DAYS[newBox - 1] || 3;
           await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });
-          note = `Seviye ${newBox}/5. Bu spot ${days} gün sonra tekrar sorulacak.`;
+          note = `Seviye ${newBox}/${MAX_STREAK}. Bu spot ${days} gün sonra tekrar sorulacak (${MAX_STREAK - newBox} kez daha bilirsen tamamen silinecek).`;
         }
       } else {
         await updateDoc(qRef, { box: 0, nextReview: Date.now() });
-        note = "Spot Seviye 0'a döndü ve kısa sürede tekrar karşına çıkacak.";
+        note = `Spot Seviye 0/${MAX_STREAK}'a döndü ve kısa sürede tekrar karşına çıkacak.`;
       }
       await loadUserQuestions();
     } catch (e) { console.error("Güncellenemedi:", e); }

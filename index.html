@@ -987,10 +987,16 @@ SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
       if (isCorrect) {
         const newBox = oldBox + 1;
         if (newBox >= MAX_STREAK) {
-          await deleteDoc(qRef);
-          await deleteFromTelegramBot(activeQuizQuestion.keyTakeaway);
-          note = `🔥 3/${MAX_STREAK} tamamlandı! Bu spotu tamamen öğrendin; hem web arşivinden hem de Telegram'dan kalıcı olarak silindi.`;
-        } else {
+  await updateDoc(qRef, {
+    box: MAX_STREAK,
+    learned: true,
+    nextReview: 0
+  });
+
+  await deleteFromTelegramBot(activeQuizQuestion.keyTakeaway);
+
+  note = `🔥 ${MAX_STREAK}/${MAX_STREAK} tamamlandı! Bu spotu öğrendin. Telegram'dan silindi ve web arşivindeki Öğrenilenler bölümüne taşındı.`;
+} else {
           const days = INTERVAL_DAYS[newBox - 1] || 3;
           await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });
           note = `Seviye ${newBox}/${MAX_STREAK}. Bu spot ${days} gün sonra tekrar sorulacak (${MAX_STREAK - newBox} kez daha bilirsen tamamen silinecek).`;

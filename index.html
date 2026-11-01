@@ -304,7 +304,7 @@
   const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
   const BOT_API_URL = "https://tus-telegram-bot.medetarikurt.workers.dev";
   const COL = "tus_questions";
-  const MAX_STREAK = 3; // 3 kez bilince tamamen siler
+  const MAX_STREAK = 3; // 3 kez bilince öğrenilenlere taşır
   const INTERVAL_DAYS = [1, 3];
   const DAY = 86400000;
 
@@ -823,77 +823,76 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   }
 
   function showQuizQuestion() {
-  const { src, data } = quizQueue[quizIndex];
-  activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
-  currentQuizData = data;
+    const { src, data } = quizQueue[quizIndex];
+    activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
+    currentQuizData = data;
 
-  $("quizResult").classList.add("hidden");
-  $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
-  $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/${MAX_STREAK}`;
-  $("quizQuestion").textContent = data.question;
-  $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
+    $("quizResult").classList.add("hidden");
+    $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
+    $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box || 0}/${MAX_STREAK}`;
+    $("quizQuestion").textContent = data.question;
+    $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
 
-  const oc = $("quizOptions");
-  oc.innerHTML = "";
+    const optionsContainer = $("quizOptions");
+    optionsContainer.innerHTML = "";
 
-  Object.entries(data.options).forEach(([key, val]) => {
-    const b = document.createElement("button");
-    b.className = "opt";
-    b.dataset.key = key;
-    b.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
-    b.onclick = () => handleQuizSelection(key, b);
-    oc.appendChild(b);
-  });
+    Object.entries(data.options).forEach(([key, val]) => {
+      const button = document.createElement("button");
+      button.className = "opt";
+      button.dataset.key = key;
+      button.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
+      button.onclick = () => handleQuizSelection(key, button);
+      optionsContainer.appendChild(button);
+    });
 
-  const delBtn = document.createElement("button");
-  delBtn.className = "link danger";
-  delBtn.textContent = "🗑️ Bu spotu sil";
-  delBtn.style.marginTop = "12px";
-  delBtn.onclick = deleteActiveQuizSpot;
-  oc.appendChild(delBtn);
-} async function deleteActiveQuizSpot() {
-  if (!activeQuizQuestion) return;
-
-  const q = activeQuizQuestion;
-
-  if (!confirm("Bu spot hem web arşivinden hem Telegram'dan kalıcı olarak silinsin mi?")) return;
-
-  const btn = document.querySelector("#quizOptions button.link.danger");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Siliniyor...";
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "link danger";
+    deleteButton.textContent = "🗑️ Bu spotu sil";
+    deleteButton.style.marginTop = "12px";
+    deleteButton.onclick = deleteActiveQuizSpot;
+    optionsContainer.appendChild(deleteButton);
   }
 
-  try {
-    await deleteDoc(doc(db, COL, q.id));
-    await deleteFromTelegramBot(q.keyTakeaway);
+  async function deleteActiveQuizSpot() {
+    if (!activeQuizQuestion) return;
 
-    allQuestions = allQuestions.filter(x => x.id !== q.id);
-    quizQueue.splice(quizIndex, 1);
+    const question = activeQuizQuestion;
+    if (!confirm("Bu spot web arşivinden ve Telegram botundan silinsin mi?")) return;
 
-    await loadUserQuestions();
-
-    if (quizQueue.length > 0) {
-      quizIndex = Math.min(quizIndex, quizQueue.length - 1);
-      showQuizQuestion();
-    } else {
-      activeQuizQuestion = null;
-      currentQuizData = null;
-      $("quizQuestion").textContent = "Bu sette başka spot kalmadı. Yeni set getirebilirsin.";
-      $("quizOptions").innerHTML = "";
-      $("quizResult").classList.add("hidden");
-      $("nextQuizBtn").textContent = "Yeni set getir";
+    const deleteButton = document.querySelector("#quizOptions button.link.danger");
+    if (deleteButton) {
+      deleteButton.disabled = true;
+      deleteButton.textContent = "Siliniyor...";
     }
 
-  } catch (err) {
-    console.error("Spot silme hatası:", err);
-    alert("Silme sırasında hata oluştu.");
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "🗑️ Bu spotu sil";
+    try {
+      await deleteDoc(doc(db, COL, question.id));
+      await deleteFromTelegramBot(question.keyTakeaway);
+
+      allQuestions = allQuestions.filter(item => item.id !== question.id);
+      quizQueue.splice(quizIndex, 1);
+      await loadUserQuestions();
+
+      if (quizQueue.length > 0) {
+        quizIndex = Math.min(quizIndex, quizQueue.length - 1);
+        showQuizQuestion();
+      } else {
+        activeQuizQuestion = null;
+        currentQuizData = null;
+        $("quizQuestion").textContent = "Bu sette başka spot kalmadı. Yeni set getirebilirsin.";
+        $("quizOptions").innerHTML = "";
+        $("quizResult").classList.add("hidden");
+        $("nextQuizBtn").textContent = "Yeni set getir";
+      }
+    } catch (error) {
+      console.error("Spot silme hatası:", error);
+      alert("Web arşivinden silme sırasında hata oluştu. Sayfayı yenileyip tekrar dene.");
+      if (deleteButton) {
+        deleteButton.disabled = false;
+        deleteButton.textContent = "🗑️ Bu spotu sil";
+      }
     }
   }
-}
 
   window.nextQuiz = () => {
     if (quizIndex + 1 < quizQueue.length) {
@@ -965,19 +964,6 @@ Spotlar:
 ${spots}`;
 
 
-SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
-{
-  "questions": [
-    {
-      "no": 1,
-      "question": "Kısa klinik vaka metni",
-      "options": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
-      "answer": "A",
-      "explanation": "1 cümlelik çok net çözüm"
-    }
-  ]
-}`;
-
     try {
       const text = await callWorker({ prompt, model: currentModel });
       const data = parseBatch(text);
@@ -1034,7 +1020,7 @@ SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
 
   await deleteFromTelegramBot(activeQuizQuestion.keyTakeaway);
 
-  note = `🔥 ${MAX_STREAK}/${MAX_STREAK} tamamlandı! Bu spotu öğrendin. Telegram'dan silindi ve web arşivindeki Öğrenilenler bölümüne taşındı.`;
+  note = `🔥 ${MAX_STREAK}/${MAX_STREAK} tamamlandı! Bu spot öğrenildi ve web arşivindeki Öğrenilenler bölümüne taşındı. Telegram'dan silinmesi için istek gönderildi.`;
 } else {
           const days = INTERVAL_DAYS[newBox - 1] || 3;
           await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });

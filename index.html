@@ -921,10 +921,49 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     $("quizStreakBadge").textContent = "";
 
     const spots = picked.map((q, i) => `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`).join("\n");
-    const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, KISA ve NET bir klinik vaka sorusu yaz. Laf kalabalığı yapma.
+   
+const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, GERÇEK TUS SINAVI ZORLUĞUNDA klinik vaka sorusu hazırla.
+
+SORU HAZIRLAMA KURALLARI:
+1. Sorular orta-zor ve zor seviyede olsun. Kolay, doğrudan ezber sorusu yazma.
+2. Her soru klinik bir senaryo içersin. Anamnez, fizik muayene ve gerekli laboratuvar bulgularını kullan.
+3. Spot bilgisini doğrudan sorma. Öğrencinin bu bilgiyi klinik vakaya uygulamasını gerektir.
+4. Birbirine yakın ve güçlü çeldiriciler oluştur. Yanlış seçenekler de tıbben makul olsun.
+5. Tanı, ayırıcı tanı, patofizyoloji, farmakoloji, komplikasyon ve tedavi mekanizmalarını uygun spotlarda ölç.
+6. Gereksiz ve gerçek dışı ayrıntılarla vakayı uzatma.
+7. Her soruda yalnızca bir kesin doğru cevap olsun.
+8. Sorular birbirini tekrar etmesin.
+9. Spotta bulunmayan bilgiyi sorunun temel cevabı haline getirme.
+10. TUS'taki gibi dikkatli klinik yorum gerektiren sorular hazırla.
+
+ÇÖZÜM KURALLARI:
+- Doğru cevabın neden doğru olduğunu açıkla.
+- Diğer dört seçeneğin neden yanlış olduğunu ayrı ayrı kısaca açıkla.
+- Sorunun ölçtüğü kritik TUS bilgisini en sonda belirt.
+- Cevap anahtarı kesin ve tutarlı olsun.
+
+SADECE GEÇERLİ JSON DÖNDÜR:
+{
+  "questions": [
+    {
+      "no": 1,
+      "question": "Klinik vaka ve soru metni",
+      "options": {
+        "A": "Seçenek A",
+        "B": "Seçenek B",
+        "C": "Seçenek C",
+        "D": "Seçenek D",
+        "E": "Seçenek E"
+      },
+      "answer": "A",
+      "explanation": "Doğru cevabın gerekçesi. A-E seçeneklerinin neden doğru veya yanlış olduğunun açıklaması. Kritik TUS bilgisi."
+    }
+  ]
+}
 
 Spotlar:
-${spots}
+${spots}`;
+
 
 SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
 {

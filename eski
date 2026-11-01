@@ -1,1 +1,844 @@
 
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>TUS Asistanı</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#f3f4f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#131416" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3406/3406828.png">
+  <style>
+    :root {
+      --bg: #f3f4f5;
+      --surface: #ffffff;
+      --raised: #f7f8f9;
+      --text: #1b1d20;
+      --muted: #6a6f76;
+      --line: #dfe2e5;
+      --accent: #36628f;
+      --accent-text: #ffffff;
+      --accent-soft: #e7eef6;
+      --ok: #2b7248;
+      --ok-soft: #e7f2eb;
+      --bad: #a8372e;
+      --bad-soft: #f8e9e7;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --r: 14px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #131416;
+        --surface: #1b1c1f;
+        --raised: #222428;
+        --text: #e6e7e8;
+        --muted: #9a9ea5;
+        --line: #2b2d32;
+        --accent: #86aedb;
+        --accent-text: #0f141a;
+        --accent-soft: #212b37;
+        --ok: #84c79d;
+        --ok-soft: #1c2a21;
+        --bad: #e49188;
+        --bad-soft: #2c1f1e;
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { background: var(--bg); }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: var(--sans); font-size: 16px; line-height: 1.5;
+      color: var(--text); background: var(--bg);
+      -webkit-text-size-adjust: 100%;
+    }
+    button, input, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    .hidden { display: none !important; }
+    .wrap { max-width: 600px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(96px + env(safe-area-inset-bottom, 0px)); }
+
+    header { text-align: center; padding: 6px 0 20px; }
+    header h1 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
+    #authStatus { margin-top: 2px; font-size: 12px; color: var(--muted); }
+    #authStatus::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: 1px; }
+    #authStatus.ok::before { background: var(--ok); }
+    #authStatus.err::before { background: var(--bad); }
+
+    section { display: grid; gap: 14px; }
+
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+    .card-title { font-size: 15px; font-weight: 600; margin: 0; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .center { text-align: center; }
+
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 0 16px; width: 100%;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+      font-weight: 550; text-align: center;
+    }
+    .btn:active { transform: scale(0.985); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+    .btn:disabled { opacity: .55; cursor: default; }
+    .btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .link { background: none; border: 0; padding: 6px 0; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+    .link.danger:hover { color: var(--bad); }
+    button:focus-visible, textarea:focus-visible, label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px; }
+    .seg button { background: none; border: 0; border-radius: 9px; padding: 9px 8px; font-size: 14px; color: var(--muted); text-align: center; }
+    .seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+
+    textarea {
+      width: 100%; min-height: 92px; resize: vertical; display: block;
+      background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 16px;
+    }
+    textarea::placeholder { color: var(--muted); }
+
+    .scan { display: grid; gap: 12px; text-align: center; }
+    .scan .hint { font-size: 13px; color: var(--muted); }
+    #imagePreviewContainer { display: grid; gap: 10px; }
+    #imagePreviewContainer img { width: 100%; max-height: 300px; object-fit: contain; border-radius: 10px; background: var(--raised); display: block; }
+    .status-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: var(--muted); min-height: 24px; }
+    .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+    .reading { font-family: var(--serif); font-size: 17px; line-height: 1.7; }
+    .reading strong { font-weight: 700; }
+    .spot { font-family: var(--serif); font-size: 17.5px; line-height: 1.6; padding: 12px 14px; background: var(--accent-soft); border-radius: 10px; }
+    .label { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+    .pre { white-space: pre-wrap; }
+    .meta { color: var(--muted); font-size: 14px; }
+
+    .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .result-head h3 { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.3; }
+    .stack > * + * { margin-top: 14px; }
+
+    .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 1px 0; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip { white-space: nowrap; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+    #questionsList { display: grid; gap: 12px; }
+    .item-title { font-weight: 650; line-height: 1.3; }
+    .item-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .item-foot .actions { display: flex; gap: 16px; }
+    details { border-top: 1px solid var(--line); padding-top: 10px; }
+    details summary { cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 550; list-style: none; text-align: center; }
+    details summary::-webkit-details-marker { display: none; }
+    details[open] summary { margin-bottom: 10px; }
+    details .reading { font-size: 16px; }
+    .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+
+    .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
+    .opt {
+      display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
+      background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; min-height: 48px;
+    }
+    .opt + .opt { margin-top: 8px; }
+    .opt .k { font-weight: 650; color: var(--muted); width: 1.2ch; flex-shrink: 0; }
+    .opt.right { border-color: var(--ok); background: var(--ok-soft); }
+    .opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+    .opt:disabled { cursor: default; color: var(--text); }
+    #quizResult { border-radius: 12px; padding: 14px; }
+    #quizResult.right { background: var(--ok-soft); }
+    #quizResult.wrong { background: var(--bad-soft); }
+    #quizResultTitle { font-weight: 650; }
+    #quizResult.right #quizResultTitle { color: var(--ok); }
+    #quizResult.wrong #quizResultTitle { color: var(--bad); }
+    #quizNote { margin-top: 4px; font-size: 14px; color: var(--muted); }
+    #quizExplanation { margin: 10px 0 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
+
+    nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      background: var(--surface); border-top: 1px solid var(--line);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    nav .inner { max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+    nav button { position: relative; background: none; border: 0; padding: 10px 4px 9px; color: var(--muted); display: grid; justify-items: center; gap: 3px; font-size: 12px; font-weight: 550; }
+    nav button svg { width: 24px; height: 24px; }
+    nav button.on { color: var(--accent); }
+    nav .badge { position: absolute; top: 5px; left: calc(50% + 7px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 650; }
+
+    #toast {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      background: var(--text); color: var(--bg); border-radius: 12px; padding: 11px 16px;
+      display: flex; gap: 18px; align-items: center; font-size: 14px; z-index: 50; white-space: nowrap;
+    }
+    #toast button { background: none; border: 0; color: inherit; font-weight: 650; text-decoration: underline; padding: 0; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>TUS Asistanı</h1>
+    <div id="authStatus">Bağlanıyor</div>
+  </header>
+
+  <main>
+
+    <section id="sectionAdd">
+      <div class="seg" role="group" aria-label="Model">
+        <button id="modelFlash" class="on" onclick="setModel('gemini-3.8-flash')">Flash, hızlı</button>
+        <button id="modelPro" onclick="setModel('gemini-3.8-pro')">Pro, derin vaka</button>
+      </div>
+
+      <div class="card scan">
+        <h2 class="card-title">Soruyu tara</h2>
+        <div class="pair">
+          <label class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Fotoğraf çek
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelect(event)">
+          </label>
+          <label class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>
+            Galeriden seç
+            <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
+          </label>
+        </div>
+        <div class="hint">Fotoğraf seçilince otomatik analize başlar.</div>
+
+        <div id="imagePreviewContainer" class="hidden">
+          <img id="imagePreview" alt="Seçilen soru görseli">
+          <div class="status-row" id="scanStatus"></div>
+          <button class="link danger" onclick="clearImage()">Görseli Kaldır</button>
+        </div>
+      </div>
+
+      <div class="card stack">
+        <h2 class="card-title">Metinle ekle</h2>
+        <textarea id="questionInput" rows="3" placeholder="Soruyu yaz ya da fotoğrafa not ekle. Örnek: C şıkkını anlamadım."></textarea>
+        <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()">Analiz et ve kaydet</button>
+      </div>
+
+      <div id="resultCard" class="card stack hidden">
+        <div class="result-head">
+          <div>
+            <h3 id="resSubBadge">Konu</h3>
+            <div class="meta" id="resBadge">Branş</div>
+          </div>
+          <span id="resSaved" class="meta">Kaydedildi</span>
+        </div>
+        <div class="spot" id="resKeyTakeaway"></div>
+        <div>
+          <div class="label">Çözüm ve patofizyoloji</div>
+          <div id="resExplanation" class="reading pre"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sectionArchive" class="hidden">
+      <div class="seg">
+        <button id="statusActive" class="on" onclick="setStatus('active')">Çalışılacak <span id="cntActive">0</span></button>
+        <button id="statusLearned" onclick="setStatus('learned')">Öğrenilen <span id="cntLearned">0</span></button>
+      </div>
+      <div id="branchFilters" class="chips"></div>
+      <div id="questionsList"><div class="empty">Yükleniyor</div></div>
+      <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
+    </section>
+
+    <section id="sectionQuiz" class="hidden">
+      <div class="card stack center">
+        <div>
+          <h2 class="card-title">Tekrar testi</h2>
+          <div class="muted">Bugün vadesi gelen spot: <b id="dueCount">0</b></div>
+        </div>
+        <div class="seg" id="countSeg" role="group" aria-label="Soru sayısı">
+          <button data-n="1" onclick="setQuizCount(1)">1 soru</button>
+          <button data-n="3" onclick="setQuizCount(3)">3 soru</button>
+          <button data-n="5" onclick="setQuizCount(5)">5 soru</button>
+          <button data-n="10" onclick="setQuizCount(10)">10 soru</button>
+        </div>
+        <button id="newQuizBtn" class="btn primary" onclick="generateQuiz()">Soru getir</button>
+      </div>
+
+      <div id="quizContainer" class="card stack hidden">
+        <div class="bar">
+          <span id="quizSubBadge" class="meta">Konu</span>
+          <span id="quizStreakBadge" class="meta">Seviye 0/5</span>
+        </div>
+        <p id="quizQuestion" class="quiz-q"></p>
+        <div id="quizOptions"></div>
+        <div id="quizResult" class="hidden">
+          <div id="quizResultTitle"></div>
+          <div id="quizNote"></div>
+          <p id="quizExplanation"></p>
+          <button id="nextQuizBtn" class="btn" onclick="nextQuiz()">Sıradaki soru</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<nav>
+  <div class="inner">
+    <button id="tabAddBtn" class="on" onclick="switchTab('add')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Soru ekle
+    </button>
+    <button id="tabArchiveBtn" onclick="switchTab('archive')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h14"/></svg>
+      Arşiv (<span id="archiveCount">0</span>)
+    </button>
+    <button id="tabQuizBtn" onclick="switchTab('quiz')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>
+      Test
+      <span class="badge hidden" id="dueBadge">0</span>
+    </button>
+  </div>
+</nav>
+
+<div id="toast" class="hidden"><span id="toastText"></span><button id="toastUndo">Geri al</button></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAS-Xf6I1xDlep59iZAphe-PzJFzddS-N8",
+    authDomain: "tusaistanzeka.firebaseapp.com",
+    projectId: "tusaistanzeka",
+    storageBucket: "tusaistanzeka.firebasestorage.app",
+    messagingSenderId: "686279505904",
+    appId: "1:686279505904:web:c6ecfb760106e4476ccf35",
+    measurementId: "G-9SC3CQ1771"
+  };
+  const WORKER_URL = "https://tusgeminizeka.medetarikurt.workers.dev";
+  const COL = "tus_questions";
+  const INTERVAL_DAYS = [1, 3, 7, 21];
+  const DAY = 86400000;
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  let selectedImageBase64 = null, selectedImageMime = null;
+  let currentModel = "gemini-3.8-flash";
+  let allQuestions = [];
+  let selectedBranchFilter = "All";
+  let selectedStatus = "active";
+  let activeQuizQuestion = null, currentQuizData = null;
+  let analyzing = false;
+
+  // Toplu test: üretilen soruların kuyruğu ve seçili soru sayısı
+  let quizQueue = [], quizIndex = 0;
+  let quizCount = parseInt(localStorage.getItem("tus_quiz_count") || "5", 10);
+  if (![1, 3, 5, 10].includes(quizCount)) quizCount = 5;
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+  function setAuth(text, cls) { const el = $("authStatus"); el.textContent = text; el.className = cls || ""; }
+
+  signInAnonymously(auth).catch(err => console.error("Auth hatası:", err));
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      setAuth("Bağlı", "ok");
+      let known = JSON.parse(localStorage.getItem("tus_known_uids") || "[]");
+      if (!known.includes(user.uid)) { known.push(user.uid); localStorage.setItem("tus_known_uids", JSON.stringify(known)); }
+      await migrateOldData(known);
+      await loadUserQuestions();
+    } else {
+      setAuth("Bağlantı yok", "err");
+    }
+  });
+
+  async function migrateOldData(uids) {
+    for (const uid of uids) {
+      try {
+        const snap = await getDocs(collection(db, "users", uid, "questions"));
+        for (const d of snap.docs) {
+          const data = d.data();
+          if (data.branch !== "SİSTEM MESAJI" && data.branch !== "API HATASI") await setDoc(doc(db, COL, d.id), data);
+          await deleteDoc(d.ref);
+        }
+      } catch (e) {}
+    }
+  }
+
+  function extractCleanJSON(raw) {
+    const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+    if (a !== -1 && b !== -1) return JSON.parse(cleaned.substring(a, b + 1));
+    return JSON.parse(cleaned);
+  }
+
+  async function callWorker(body) {
+    const res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(res.status === 429 ? "Ücretsiz kota doldu, biraz sonra tekrar dene." : "Sunucu hatası (" + res.status + ")");
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("Yapay zeka yanıtı alınamadı.");
+    return text;
+  }
+
+  function showToast(text, onUndo) {
+    const t = $("toast");
+    $("toastText").textContent = text;
+    t.classList.remove("hidden");
+    clearTimeout(showToast.timer);
+    $("toastUndo").onclick = async () => { t.classList.add("hidden"); await onUndo(); };
+    showToast.timer = setTimeout(() => t.classList.add("hidden"), 7000);
+  }
+
+  window.switchTab = (tab) => {
+    $("sectionAdd").classList.toggle("hidden", tab !== "add");
+    $("sectionArchive").classList.toggle("hidden", tab !== "archive");
+    $("sectionQuiz").classList.toggle("hidden", tab !== "quiz");
+    $("tabAddBtn").classList.toggle("on", tab === "add");
+    $("tabArchiveBtn").classList.toggle("on", tab === "archive");
+    $("tabQuizBtn").classList.toggle("on", tab === "quiz");
+    window.scrollTo({ top: 0 });
+  };
+
+  window.setModel = (model) => {
+    currentModel = model;
+    const isPro = model.includes("pro");
+    $("modelFlash").classList.toggle("on", !isPro);
+    $("modelPro").classList.toggle("on", isPro);
+  };
+
+  // Fotoğraf seçilince otomatik analiz etmez, sadece ekrana basar. Sen butona basarsın.
+  window.handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file || analyzing) return;
+    selectedImageMime = "image/jpeg";
+    $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ Fotoğraf eklendi. (Gerekirse notunu yazıp Analiz Et'e bas)</span>`;
+    $("imagePreviewContainer").classList.remove("hidden");
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const max = 1280;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > max) { h *= max / w; w = max; } }
+        else { if (h > max) { w *= max / h; h = max; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        selectedImageBase64 = dataUrl.split(",")[1];
+        $("imagePreview").src = dataUrl;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.clearImage = () => {
+    selectedImageBase64 = null; selectedImageMime = null;
+    $("cameraInput").value = ""; $("galleryInput").value = "";
+    $("imagePreviewContainer").classList.add("hidden");
+    $("scanStatus").innerHTML = "";
+  };
+
+  const words = s => new Set(String(s || "").toLowerCase().replace(/[^a-z0-9çğıöşüâî\s]/gi, " ").split(/\s+/).filter(w => w.length > 2));
+  function similarity(a, b) {
+    const A = words(a), B = words(b);
+    if (!A.size || !B.size) return 0;
+    let inter = 0; A.forEach(w => { if (B.has(w)) inter++; });
+    return inter / (A.size + B.size - inter);
+  }
+  function findDuplicate(p) {
+    const sub = (p.subTopic || "").trim().toLowerCase();
+    return allQuestions.find(q =>
+      (sub && (q.subTopic || "").trim().toLowerCase() === sub && q.branch === p.branch) ||
+      similarity(q.keyTakeaway, p.keyTakeaway) >= 0.55);
+  }
+
+  window.analyzeAndSaveQuestion = async () => {
+    if (analyzing) return;
+    const questionText = $("questionInput").value.trim();
+    if (!questionText && !selectedImageBase64) { alert("Önce sorunun fotoğrafını çek ya da metni yaz."); return; }
+
+    analyzing = true;
+    const btn = $("analyzeBtn");
+    btn.disabled = true; btn.textContent = "Analiz ediliyor…";
+    if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
+
+      const prompt = `
+Sen uzman bir TUS (Tıpta Uzmanlık Sınavı) hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
+Cevabı KESİNLİKLE sadece aşağıdaki geçerli JSON formatında ver, dışına hiçbir açıklama ekleme:
+{
+  "branch": "Branş Adı (Sadece şunlardan biri: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+  "topic": "Konu Başlığı (Örn: Hematoloji)",
+  "subTopic": "Alt Konu (Örn: G6PD Eksikliği / Favizm)",
+  "keyTakeaway": "TUS'ta soru yaptıracak 1-2 cümlelik çok net, vurucu SPOT bilgi",
+  "explanation": "Bir öğrenciye anlatır gibi, sade ve akıcı Türkçe ile yaz. Önce olayın mantığını 1-2 cümlede özetle, sonra mekanizmayı adım adım açıkla (neden böyle oluyor?), en sonda çeldirici şıkların neden yanlış olduğunu kısaca belirt. Gereksiz süs ve tekrar yapma, önemli terimleri **kalın** yaz. En fazla 8-10 cümle."
+}
+Kullanıcı Notu / Soru Metni: ${questionText}
+    `;
+    
+
+    try {
+      const text = await callWorker({ prompt, model: currentModel, imageBase64: selectedImageBase64, mimeType: selectedImageMime });
+      const parsed = extractCleanJSON(text);
+      let saved = false;
+
+      if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI" && parsed.branch !== "Kota Doldu") {
+        const dup = findDuplicate(parsed);
+        let doSave = true;
+        if (dup) doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
+        
+        if (doSave) {
+          await addDoc(collection(db, COL), {
+            branch: parsed.branch || "Genel",
+            topic: parsed.topic || "Genel",
+            subTopic: parsed.subTopic || "",
+            rawQuestion: questionText || "Fotoğraflı TUS sorusu",
+            aiExplanation: parsed.explanation || "",
+            keyTakeaway: parsed.keyTakeaway || "",
+            box: 0, nextReview: Date.now(), learned: false, deleted: false,
+            createdAtMs: Date.now()
+          });
+          saved = true;
+
+          // YENİ EKLEME: TELEGRAM BOTA DA GÖNDER
+          try {
+            const botApiUrl = "https://tus-telegram-bot.medetarikurt.workers.dev";
+            await fetch(botApiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "save_web_question",
+                data: {
+                  branch: parsed.branch || "Genel",
+                  keyTakeaway: parsed.keyTakeaway || "",
+                  aiExplanation: parsed.explanation || ""
+                }
+              })
+            });
+          } catch (e) { console.log("Telegram bota giderken hata:", e); }
+          // YENİ EKLEME BİTİŞİ
+          
+        }
+      }
+
+      $("resSaved").textContent = saved ? "Kaydedildi" : "Kaydedilmedi";
+      $("resBadge").textContent = [parsed.branch, parsed.topic].filter(Boolean).join(", ");
+      $("resSubBadge").textContent = parsed.subTopic || parsed.topic || "";
+      $("resKeyTakeaway").innerHTML = fmt(parsed.keyTakeaway || "");
+      $("resExplanation").innerHTML = fmt(parsed.explanation || "");
+      $("resultCard").classList.remove("hidden");
+
+      $("questionInput").value = "";
+      clearImage();
+      await loadUserQuestions();
+      $("resultCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      console.error("Analiz hatası:", err);
+      if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Lütfen tekrar dene.";
+      alert("Çözüm sırasında hata oluştu: " + err.message);
+    } finally {
+      analyzing = false;
+      btn.disabled = false; btn.textContent = "Analiz et ve kaydet";
+    }
+  };
+
+  window.loadUserQuestions = async () => {
+    try {
+      const snap = await getDocs(collection(db, COL));
+      const items = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.deleted === true) return;
+        if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") return;
+        items.push({
+          id: d.id, ...data,
+          box: typeof data.box === "number" ? data.box : 0,
+          nextReview: typeof data.nextReview === "number" ? data.nextReview : 0,
+          learned: data.learned === true,
+          sortTime: data.createdAtMs || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0)
+        });
+      });
+      items.sort((a, b) => b.sortTime - a.sortTime);
+      allQuestions = items;
+      refreshAll();
+    } catch (err) { console.error("Arşiv yükleme hatası:", err); }
+  };
+
+  function refreshAll() {
+    const active = allQuestions.filter(q => !q.learned);
+    const due = active.filter(q => q.nextReview <= Date.now()).length;
+    $("archiveCount").textContent = active.length;
+    $("cntActive").textContent = active.length;
+    $("cntLearned").textContent = allQuestions.length - active.length;
+    $("dueCount").textContent = due;
+    $("dueBadge").textContent = due;
+    $("dueBadge").classList.toggle("hidden", due === 0);
+    renderFilters(); renderQuestions();
+  }
+
+  window.setStatus = (s) => {
+    selectedStatus = s; selectedBranchFilter = "All";
+    $("statusActive").classList.toggle("on", s === "active");
+    $("statusLearned").classList.toggle("on", s === "learned");
+    renderFilters(); renderQuestions();
+  };
+
+  const inStatus = () => allQuestions.filter(q => selectedStatus === "learned" ? q.learned : !q.learned);
+
+  window.deleteQuestion = async (docId) => {
+    const q = allQuestions.find(x => x.id === docId);
+    if (!q) return;
+    if (!confirm(`"${q.subTopic || q.topic || "Bu spot"}" silinsin mi?`)) return;
+    try {
+      await updateDoc(doc(db, COL, docId), { deleted: true });
+      allQuestions = allQuestions.filter(x => x.id !== docId);
+      refreshAll();
+      showToast("Spot silindi", async () => {
+        await updateDoc(doc(db, COL, docId), { deleted: false });
+        await loadUserQuestions();
+      });
+    } catch (err) { console.error("Silme hatası:", err); alert("Silinirken hata oluştu."); }
+  };
+
+  window.reactivateQuestion = async (docId) => {
+    await updateDoc(doc(db, COL, docId), { learned: false, box: 0, nextReview: Date.now() });
+    await loadUserQuestions();
+  };
+
+  function renderFilters() {
+    const list = inStatus();
+    const branches = ["All", ...new Set(list.map(q => q.branch).filter(Boolean))];
+    if (selectedBranchFilter !== "All" && !branches.includes(selectedBranchFilter)) selectedBranchFilter = "All";
+    $("branchFilters").innerHTML = branches.map(b =>
+      `<button class="chip ${selectedBranchFilter === b ? "on" : ""}" data-b="${esc(b)}" onclick="setFilter(this.dataset.b)">${b === "All" ? "Tümü " + list.length : esc(b)}</button>`).join("");
+  }
+  window.setFilter = (b) => { selectedBranchFilter = b; renderFilters(); renderQuestions(); };
+
+  function reviewLabel(q) {
+    if (q.learned) return "Öğrenildi";
+    const diff = q.nextReview - Date.now();
+    if (diff <= 0) return "Tekrar zamanı geldi";
+    return Math.ceil(diff / DAY) + " gün sonra tekrar";
+  }
+
+  function renderQuestions() {
+    const base = inStatus();
+    const filtered = selectedBranchFilter === "All" ? base : base.filter(q => q.branch === selectedBranchFilter);
+    const box = $("questionsList");
+    if (!filtered.length) {
+      box.innerHTML = `<div class="empty">${selectedStatus === "learned" ? "Henüz öğrenilmiş spot yok." : "Arşivde spot yok. Soru ekle sekmesinden ilk spotunu kaydedebilirsin."}</div>`;
+      return;
+    }
+    box.innerHTML = filtered.map(q => `
+      <article class="card stack">
+        <div>
+          <div class="item-title">${esc(q.subTopic || q.topic || "Konu yok")}</div>
+          <div class="meta">${esc([q.branch, q.topic].filter(Boolean).join(", "))}</div>
+        </div>
+        <div class="spot">${fmt(q.keyTakeaway)}</div>
+        <div class="item-foot">
+          <span class="meta">Seviye ${q.box}/5, ${reviewLabel(q)}</span>
+          <div class="actions">
+            ${q.learned ? `<button class="link" onclick="reactivateQuestion('${esc(q.id)}')">Tekrar aktif et</button>` : ""}
+            <button class="link danger" onclick="deleteQuestion('${esc(q.id)}')">Sil</button>
+          </div>
+        </div>
+        <details>
+          <summary>Çözümü göster</summary>
+          <div class="reading pre">${fmt(q.aiExplanation)}</div>
+        </details>
+      </article>`).join("");
+  }
+
+  // ===================== TOPLU TEST =====================
+
+  window.setQuizCount = (n) => {
+    quizCount = n;
+    localStorage.setItem("tus_quiz_count", String(n));
+    document.querySelectorAll("#countSeg button").forEach(b => b.classList.toggle("on", Number(b.dataset.n) === n));
+  };
+
+  // Vadesi gelen spotlardan n tanesini seçer (her spot sette bir kez)
+  function pickQuestions(n) {
+    const now = Date.now();
+    const active = allQuestions.filter(q => !q.learned);
+    if (!active.length) { alert("Test için arşivinde çalışılacak en az bir spot olmalı."); return null; }
+    let pool = active.filter(q => q.nextReview <= now).sort((a, b) => a.nextReview - b.nextReview);
+    if (!pool.length) {
+      if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
+      pool = [...active].sort((a, b) => a.nextReview - b.nextReview);
+    }
+    const top = pool.slice(0, Math.max(n, 5));
+    for (let i = top.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [top[i], top[j]] = [top[j], top[i]];
+    }
+    return top.slice(0, n);
+  }
+
+  function parseBatch(raw) {
+    const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+    try { return JSON.parse(cleaned); } catch (e) {}
+    const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+    return JSON.parse(cleaned.substring(a, b + 1));
+  }
+
+  function normalizeOptions(opts) {
+    if (!opts) return null;
+    if (Array.isArray(opts)) {
+      const o = {};
+      opts.forEach((v, i) => { o[String.fromCharCode(65 + i)] = typeof v === "object" ? Object.values(v)[0] : v; });
+      return o;
+    }
+    return opts;
+  }
+
+  function showQuizQuestion() {
+    const { src, data } = quizQueue[quizIndex];
+    activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
+    currentQuizData = data;
+
+    $("quizResult").classList.add("hidden");
+    $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + `  (${quizIndex + 1}/${quizQueue.length})`;
+    $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/5`;
+    $("quizQuestion").textContent = data.question;
+    $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
+
+    const oc = $("quizOptions");
+    oc.innerHTML = "";
+    Object.entries(data.options).forEach(([key, val]) => {
+      const b = document.createElement("button");
+      b.className = "opt"; b.dataset.key = key;
+      b.innerHTML = `<span class="k">${esc(key)}</span><span>${esc(val)}</span>`;
+      b.onclick = () => handleQuizSelection(key, b);
+      oc.appendChild(b);
+    });
+  }
+
+  window.nextQuiz = () => {
+    if (quizIndex + 1 < quizQueue.length) {
+      quizIndex++;
+      showQuizQuestion();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      generateQuiz();
+    }
+  };
+
+  window.generateQuiz = async () => {
+    const picked = pickQuestions(quizCount);
+    if (!picked) return;
+
+    const btn = $("newQuizBtn");
+    btn.disabled = true; btn.textContent = "Sorular hazırlanıyor…";
+    $("quizContainer").classList.remove("hidden");
+    $("quizQuestion").textContent = picked.length > 1
+      ? `${picked.length} soru hazırlanıyor, bu biraz sürebilir…`
+      : "Soru hazırlanıyor…";
+    $("quizOptions").innerHTML = "";
+    $("quizResult").classList.add("hidden");
+    $("quizSubBadge").textContent = "";
+    $("quizStreakBadge").textContent = "";
+
+    const spots = picked.map((q, i) => `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`).join("\n");
+    const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, KISA ve NET bir klinik vaka sorusu yaz. Laf kalabalığı yapma.
+
+Spotlar:
+${spots}
+
+SADECE ŞU JSON FORMATINDA DÖN (spot sayısı kadar eleman, aynı sırada):
+{
+  "questions": [
+    {
+      "no": 1,
+      "question": "Kısa klinik vaka metni",
+      "options": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
+      "answer": "A",
+      "explanation": "1 cümlelik çok net çözüm"
+    }
+  ]
+}`;
+
+    try {
+      const text = await callWorker({ prompt, model: currentModel });
+      const data = parseBatch(text);
+
+      // Worker sistem mesajı döndürdüyse (kota vb.) çökmeden ekrana bas
+      if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") {
+        throw new Error((data.keyTakeaway || "") + " " + (data.explanation || ""));
+      }
+
+      const arr = Array.isArray(data) ? data : (Array.isArray(data.questions) ? data.questions : []);
+      quizQueue = [];
+      arr.forEach((item, idx) => {
+        const opts = normalizeOptions(item.options);
+        if (!item.question || !opts) return;
+        const src = picked[(Number(item.no) || idx + 1) - 1] || picked[idx];
+        if (!src) return;
+        quizQueue.push({ src, data: { ...item, options: opts } });
+      });
+
+      if (!quizQueue.length) throw new Error("Yapay zeka soruları oluşturamadı, tekrar dene.");
+      quizIndex = 0;
+      showQuizQuestion();
+    } catch (err) {
+      console.error("Quiz üretim hatası:", err);
+      $("quizQuestion").textContent = "Soru üretilemedi: " + err.message;
+      $("quizOptions").innerHTML = "";
+    } finally {
+      btn.disabled = false; btn.textContent = "Soru getir";
+    }
+  };
+
+  async function handleQuizSelection(selectedKey, clickedBtn) {
+    if (!currentQuizData || !activeQuizQuestion) return;
+    const btns = document.querySelectorAll("#quizOptions .opt");
+    btns.forEach(b => b.disabled = true);
+
+    const correctKey = String(currentQuizData.answer || "A").trim().toUpperCase().charAt(0);
+    const isCorrect = selectedKey === correctKey;
+    clickedBtn.classList.add(isCorrect ? "right" : "wrong");
+    if (!isCorrect) btns.forEach(b => { if (b.dataset.key === correctKey) b.classList.add("right"); });
+
+    const qRef = doc(db, COL, activeQuizQuestion.id);
+    const oldBox = activeQuizQuestion.box || 0;
+    let note = "";
+
+    try {
+      if (isCorrect) {
+        const newBox = oldBox + 1;
+        if (newBox >= 5) {
+          await updateDoc(qRef, { box: 5, learned: true, nextReview: Date.now() + 90 * DAY });
+          note = "Tüm tekrar aşamalarını geçtin. Spot Öğrenilen bölümüne taşındı.";
+        } else {
+          const days = INTERVAL_DAYS[newBox - 1];
+          await updateDoc(qRef, { box: newBox, nextReview: Date.now() + days * DAY });
+          note = `Seviye ${newBox}/5. Bu spot ${days} gün sonra tekrar sorulacak.`;
+        }
+      } else {
+        await updateDoc(qRef, { box: 0, nextReview: Date.now() });
+        note = "Spot Seviye 0'a döndü ve kısa sürede tekrar karşına çıkacak.";
+      }
+      await loadUserQuestions();
+    } catch (e) { console.error("Güncellenemedi:", e); }
+
+    const res = $("quizResult");
+    res.className = isCorrect ? "right" : "wrong";
+    $("quizResultTitle").textContent = isCorrect ? `Doğru, cevap ${correctKey}` : `Yanlış, doğru cevap ${correctKey}`;
+    $("quizNote").textContent = note;
+    $("quizExplanation").innerHTML = fmt(currentQuizData.explanation);
+    res.classList.remove("hidden");
+    res.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // Sayfa açılınca seçili soru sayısını işaretle
+  setQuizCount(quizCount);
+</script>
+</body>
+</html>

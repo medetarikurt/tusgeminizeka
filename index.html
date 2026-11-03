@@ -158,6 +158,9 @@
     #quizAskBox { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
     #quizAskInput { width: 100%; min-height: 82px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--raised); }
     #quizAskAnswer { margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--raised); white-space: pre-wrap; line-height: 1.6; }
+    #personalNoteInput { width: 100%; min-height: 76px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--raised); }
+    #questionInput { min-height: 76px; }
+    #analyzeBtn { margin-top: 2px; }
 
     nav {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
@@ -195,8 +198,13 @@
         <button id="modelPro" onclick="setModel('gemini-3.8-pro')">Pro, derin vaka</button>
       </div>
 
+      <div class="seg" role="group" aria-label="Eklenme modu">
+        <button id="modeQuestion" onclick="setInputMode('question')">Soru çözümle</button>
+        <button id="modeSpot" onclick="setInputMode('spot')">Spot çıkar</button>
+      </div>
+
       <div class="card scan">
-        <h2 class="card-title">Soruyu tara</h2>
+        <h2 class="card-title" id="scanTitle">Görseli veya metni ekle</h2>
         <div class="pair">
           <label class="btn primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
@@ -209,7 +217,8 @@
             <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
           </label>
         </div>
-        <div class="hint">Fotoğraf seçip üzerine not ekleyebilirsin.</div>
+        <div class="hint" id="scanHint">Fotoğraf seçip üzerine not ekleyebilirsin.</div>
+        <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()" disabled>Önce işlem türünü seç</button>
 
         <div id="imagePreviewContainer" class="hidden">
           <img id="imagePreview" alt="Seçilen soru görseli">
@@ -220,8 +229,7 @@
 
       <div class="card stack">
         <h2 class="card-title">Metin veya toplu not ekle</h2>
-        <textarea id="questionInput" rows="4" placeholder="Tek bir soru yaz, fotoğrafa not ekle ya da PDF'ten kopyaladığın uzun ders notlarını buraya yapıştır. Uzun metinler otomatik bölünerek tüm spotlar tek tek kaydedilir."></textarea>
-        <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()">Analiz et ve kaydet</button>
+        <textarea id="questionInput" rows="2" placeholder=""></textarea>
       </div>
 
       <div id="resultCard" class="card stack hidden"></div>
@@ -270,6 +278,11 @@
           <textarea id="quizAskInput" placeholder="Örn: Ferritin neden bu kadar yükseliyor? Bu tanıda fibrinojen neden düşer?"></textarea>
           <button id="quizAskBtn" class="btn" onclick="askQuizAssistant()">Asistana sor</button>
           <div id="quizAskAnswer" class="hidden" aria-live="polite"></div>
+          <div class="divider" style="border-top:1px solid var(--line); margin-top:8px;"></div>
+          <h3 class="card-title">Bu spota kişisel notum</h3>
+          <textarea id="personalNoteInput" placeholder="Bu spotla ilgili kendi notunu buraya yaz..."></textarea>
+          <button id="savePersonalNoteBtn" class="btn" onclick="savePersonalNote()">Notu kaydet</button>
+          <div id="personalNoteStatus" class="meta" aria-live="polite"></div>
         </div>
       </div>
     </section>
@@ -330,6 +343,7 @@
   let activeQuizQuestion = null, currentQuizData = null;
   let quizUserAnswer = null;
   let analyzing = false;
+  let currentInputMode = null;
 
   let quizQueue = [], quizIndex = 0;
   let quizCount = parseInt(localStorage.getItem("tus_quiz_count") || "5", 10);
@@ -466,11 +480,24 @@
     $("modelPro").classList.toggle("on", isPro);
   };
 
+  window.setInputMode = (mode) => {
+    currentInputMode = mode === "spot" ? "spot" : "question";
+    const spotOnly = currentInputMode === "spot";
+    $("modeQuestion").classList.toggle("on", !spotOnly);
+    $("modeSpot").classList.toggle("on", spotOnly);
+    $("scanTitle").textContent = spotOnly ? "Görselden spot çıkar" : "Soruyu tara";
+    $("scanHint").textContent = spotOnly
+      ? "Sendrom, tablo, şema veya ders görselinden TUS spotları çıkar."
+      : "Soru fotoğrafını yükle veya soru metnini yapıştır.";
+    $("analyzeBtn").disabled = false;
+    $("analyzeBtn").textContent = spotOnly ? "Spot çıkar ve kaydet" : "Soruyu çözümle ve kaydet";
+  };
+
   window.handleImageSelect = (event) => {
     const file = event.target.files[0];
     if (!file || analyzing) return;
     selectedImageMime = "image/jpeg";
-    $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ Fotoğraf eklendi. (Gerekirse notunu yazıp Analiz Et'e bas)</span>`;
+    $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ Fotoğraf eklendi.</span>`;
     $("imagePreviewContainer").classList.remove("hidden");
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -515,6 +542,7 @@
 
   window.analyzeAndSaveQuestion = async () => {
     if (analyzing) return;
+    if (!currentInputMode) { alert("Önce Spot çıkar veya Soru çözümle seç."); return; }
     const questionText = $("questionInput").value.trim();
     if (!questionText && !selectedImageBase64) { alert("Önce sorunun fotoğrafını çek ya da metni yaz."); return; }
 
@@ -524,6 +552,7 @@
     if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
 
     const chunks = selectedImageBase64 ? [questionText] : splitTextIntoChunks(questionText, 900);
+    const spotOnlyMode = currentInputMode === "spot";
     let allExtractedItems = [];
 
     try {
@@ -535,7 +564,27 @@
         const chunkText = chunks[c];
         const isMultiMode = !selectedImageBase64 && chunkText.length > 220;
 
-        const prompt = isMultiMode ? `
+        const prompt = spotOnlyMode ? `
+Sen uzman bir TUS hocasısın. Gönderilen görseli veya metni incele ve içindeki TUS açısından değerli bilgileri kısa, bağımsız spotlara dönüştür.
+- Görselde birden fazla önemli bilgi varsa ayrı spotlar çıkar.
+- En fazla 8 kaliteli spot üret; tekrar eden veya önemsiz bilgileri alma.
+- Soru kökü ve şıklar varsa bunları spotun içine kopyalama; ölçülen temel bilgiyi çıkar.
+- Her spot 1-2 net cümle olsun.
+- Açıklama en fazla 2 kısa cümle olsun.
+- Sadece geçerli JSON döndür, başka açıklama yazma:
+{
+  "items": [
+    {
+      "branch": "Branş Adı (Sadece: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+      "topic": "Konu Başlığı",
+      "subTopic": "Alt Konu",
+      "keyTakeaway": "1-2 cümlelik net TUS spotu",
+      "explanation": "En fazla 2 kısa cümlelik açıklama"
+    }
+  ]
+}
+Kullanıcı notu: ${chunkText}
+` : isMultiMode ? `
 Sen uzman bir TUS hocasısın. Aşağıdaki ders notunu/metni analiz et ve içindeki TUS açısından değerli spot bilgileri ayıkla.
 ÖNEMLİ SINIRLAR (YANITIN YARIDA KESİLMEMESİ İÇİN UYULMASI ZORUNLU):
 1. Bu metin parçasından EN FAZLA 3 ADET en önemli spot bilgi çıkar.
@@ -602,7 +651,9 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
           let doSave = true;
 
           if (dup) {
-            if (allExtractedItems.length === 1) {
+            if (spotOnlyMode) {
+              doSave = false;
+            } else if (allExtractedItems.length === 1) {
               doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
             } else {
               doSave = false;
@@ -665,24 +716,31 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       }
 
       const resCard = $("resultCard");
-      const summaryHeader = allExtractedItems.length > 1 
-        ? `<div style="font-weight:650; color:var(--accent); font-size:15px;">🎉 Toplam ${allExtractedItems.length} spot ayıklandı (${savedCount} tanesi yeni kaydedildi ve Telegram'a gönderildi)</div><hr class="batch-divider">`
-        : "";
-      
-      resCard.innerHTML = summaryHeader + resultHTMLs.join('<hr class="batch-divider">');
-      resCard.classList.remove("hidden");
+      if (spotOnlyMode) {
+        resCard.classList.add("hidden");
+      } else {
+        const summaryHeader = allExtractedItems.length > 1
+          ? `<div style="font-weight:650; color:var(--accent); font-size:15px;">🎉 Toplam ${allExtractedItems.length} spot ayıklandı (${savedCount} tanesi yeni kaydedildi ve Telegram'a gönderildi)</div><hr class="batch-divider">`
+          : "";
+        resCard.innerHTML = summaryHeader + resultHTMLs.join('<hr class="batch-divider">');
+        resCard.classList.remove("hidden");
+        resCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
 
       $("questionInput").value = "";
       clearImage();
       await loadUserQuestions();
-      resCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (spotOnlyMode) {
+        $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${savedCount} yeni spot kaydedildi. ${allExtractedItems.length - savedCount} benzer/mevcut spot atlandı.</span>`;
+      }
     } catch (err) {
       console.error("Analiz hatası:", err);
       if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Lütfen tekrar dene.";
       alert("Çözüm sırasında hata oluştu: " + err.message);
     } finally {
       analyzing = false;
-      btn.disabled = false; btn.textContent = "Analiz et ve kaydet";
+      btn.disabled = !currentInputMode;
+      btn.textContent = currentInputMode === "spot" ? "Spot çıkar ve kaydet" : currentInputMode === "question" ? "Soruyu çözümle ve kaydet" : "Önce işlem türünü seç";
     }
   };
 
@@ -859,6 +917,10 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   currentQuizData = data;
   quizUserAnswer = null;
   $("quizAskInput").value = "";
+  $("personalNoteInput").value = activeQuizQuestion.personalNote || "";
+  $("personalNoteStatus").textContent = "";
+  $("savePersonalNoteBtn").disabled = false;
+  $("savePersonalNoteBtn").textContent = "Notu kaydet";
   $("quizAskAnswer").textContent = "";
   $("quizAskAnswer").classList.add("hidden");
   $("quizAskBtn").disabled = false;
@@ -1075,6 +1137,27 @@ ${spots}`;
     res.classList.remove("hidden");
     res.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+
+  window.savePersonalNote = async () => {
+    if (!activeQuizQuestion) return;
+    const btn = $("savePersonalNoteBtn");
+    const note = $("personalNoteInput").value.trim();
+    btn.disabled = true;
+    btn.textContent = "Kaydediliyor…";
+    try {
+      await updateDoc(doc(db, COL, activeQuizQuestion.id), { personalNote: note });
+      activeQuizQuestion.personalNote = note;
+      const cached = allQuestions.find(q => q.id === activeQuizQuestion.id);
+      if (cached) cached.personalNote = note;
+      $("personalNoteStatus").textContent = "✓ Not bu spota kaydedildi.";
+    } catch (err) {
+      console.error("Kişisel not kaydedilemedi:", err);
+      $("personalNoteStatus").textContent = "Not kaydedilemedi. Tekrar dene.";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Notu kaydet";
+    }
+  };
 
   window.askQuizAssistant = async () => {
     const questionText = $("quizAskInput").value.trim();

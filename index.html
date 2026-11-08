@@ -290,6 +290,33 @@
         <button id="examModeBooklet" onclick="setExamMode('booklet')">📸 Kitapçık (+/- Sayfa)</button>
       </div>
 
+      <div class="card stack" id="geminiImportCard">
+        <div>
+          <h2 class="card-title">📥 Gemini sonucunu içe aktar</h2>
+          <div class="hint">Gemini'nin ürettiği JSON çıktısını buraya yapıştır. Birden fazla JSON nesnesini arka arkaya da yapıştırabilirsin. Bu işlem Claude API çağırmaz.</div>
+        </div>
+        <textarea id="geminiJsonInput" rows="7" placeholder='Gemini JSON çıktısını buraya yapıştır...
+{"items":[{"questionNo":"42","branch":"Mikrobiyoloji","topic":"Bakteriyoloji","subTopic":"...","status":"wrong","keyTakeaway":"...","explanation":"...","confidence":"high"}]}'></textarea>
+        <div class="bar">
+          <button class="btn primary" id="checkGeminiImportBtn" onclick="checkGeminiImport()">JSON'u kontrol et</button>
+          <button class="link danger" onclick="clearGeminiImport()">Temizle</button>
+        </div>
+        <div id="geminiImportPreview" class="stack hidden">
+          <div id="geminiImportSummary" class="stat-grid"></div>
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="includeUncertainGemini" style="width:auto;">
+            Orta ve düşük güvenli kayıtları da içe aktar
+          </label>
+          <div id="geminiImportConfidenceNote" class="meta"></div>
+          <details>
+            <summary id="geminiImportListTitle">Kayıt önizlemesi</summary>
+            <div id="geminiImportList" class="stack" style="margin-top:10px;"></div>
+          </details>
+          <button class="btn primary" id="saveGeminiImportBtn" onclick="saveGeminiImport()">Seçilen kayıtları arşive aktar</button>
+        </div>
+        <div id="geminiImportStatus" class="meta" role="status" aria-live="polite"></div>
+      </div>
+
       <div class="card scan">
         <h2 class="card-title" id="examTitle">Deneme Sonuç Karnesi Yükle</h2>
         <div class="hint" id="examHint">TUS sonuç karnesi veya ders-konu analiz PDF'ini yükle; ders ve alt konuları ayrı ayrı çıkarsın.</div>
@@ -1489,6 +1516,10 @@ Kullanıcı Notu: ${note}
             rawQuestion: rawTextLabel ? rawTextLabel.substring(0, 500) : "TUS Sorusu",
             aiExplanation: parsed.explanation || "",
             keyTakeaway: parsed.keyTakeaway || "",
+            questionNo: parsed.questionNo ? String(parsed.questionNo) : "",
+            examStatus: parsed.status === "empty" ? "empty" : (parsed.status === "wrong" ? "wrong" : ""),
+            confidence: parsed.confidence || "high",
+            importSource: parsed.importSource || "",
             box: 0, nextReview: Date.now(), learned: false, deleted: false,
             createdAtMs: Date.now() + i
           };
@@ -1525,6 +1556,7 @@ Kullanıcı Notu: ${note}
             </div>
             <span class="meta" style="color:${itemSaved ? 'var(--ok)' : 'var(--muted)'}">${itemSaved ? "✓ Kaydedildi" : "Atlandı (Mevcut)"}</span>
           </div>
+          <div class="meta">${parsed.status === "empty" ? "Boş bırakılmış soru" : (parsed.status === "wrong" ? "Yanlış cevaplanmış soru" : "")}${parsed.confidence ? ` · Güven: ${esc(parsed.confidence)}` : ""}</div>
           <div class="spot">${fmt(parsed.keyTakeaway || "")}</div>
           <div>
             <div class="label">Çözüm ve patofizyoloji</div>
@@ -1666,6 +1698,188 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     }
   };
 
+  // ===================== GEMINI JSON İÇE AKTARMA =====================
+  let pendingGeminiItems = [];
+
+  function splitTopLevelJsonDocuments(raw) {
+    const cleaned = String(raw || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+    if (!cleaned) throw new Error("Önce Gemini JSON çıktısını yapıştır.");
+    try { return [JSON.parse(cleaned)]; } catch (e) {}
+
+    const documents = [];
+    let start = -1;
+    let stack = [];
+    let inString = false;
+    let escaped = false;
+    const pairs = { "{": "}", "[": "]" };
+
+    for (let i = 0; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === "{" || ch === "[") {
+        if (stack.length === 0) start = i;
+        stack.push(pairs[ch]);
+      } else if (ch === "}" || ch === "]") {
+        if (!stack.length || stack.pop() !== ch) throw new Error("JSON parantezleri eşleşmiyor. Gemini çıktısını yeniden kopyala.");
+        if (stack.length === 0 && start >= 0) {
+          try { documents.push(JSON.parse(cleaned.slice(start, i + 1))); }
+          catch (e) { throw new Error("JSON bloğu okunamadı. Çıktının tamamını kopyaladığından emin ol."); }
+          start = -1;
+        }
+      }
+    }
+    if (inString || stack.length) throw new Error("JSON çıktısı eksik veya kesilmiş görünüyor.");
+    if (!documents.length) throw new Error("Geçerli JSON bulunamadı.");
+    return documents;
+  }
+
+  function unpackGeminiItems(value, out = []) {
+    if (Array.isArray(value)) {
+      value.forEach(v => unpackGeminiItems(v, out));
+      return out;
+    }
+    if (!value || typeof value !== "object") return out;
+    if (Array.isArray(value.items)) {
+      value.items.forEach(v => unpackGeminiItems(v, out));
+    } else if (value.questionNo !== undefined || value.question_no !== undefined) {
+      out.push(value);
+    }
+    return out;
+  }
+
+  function normalizeGeminiImportItem(item, index) {
+    const statusRaw = String(item.status || item.result || "").trim().toLowerCase();
+    const statusMap = {
+      wrong: "wrong", incorrect: "wrong", yanlis: "wrong", "yanlış": "wrong", y: "wrong",
+      empty: "empty", blank: "empty", bos: "empty", "boş": "empty", b: "empty"
+    };
+    const status = statusMap[statusRaw];
+    if (!status) throw new Error(`${index + 1}. kayıtta status alanı wrong veya empty olmalı.`);
+
+    const branch = String(item.branch || item.ders || "").trim();
+    const keyTakeaway = String(item.keyTakeaway || item.key_takeaway || item.spot || "").trim();
+    const questionNo = String(item.questionNo ?? item.question_no ?? item.no ?? "").trim();
+    if (!branch) throw new Error(`${index + 1}. kayıtta branch/ders alanı eksik.`);
+    if (!keyTakeaway) throw new Error(`${index + 1}. kayıtta keyTakeaway/spot alanı eksik.`);
+
+    let confidence = String(item.confidence || "medium").trim().toLowerCase();
+    if (!["high", "medium", "low"].includes(confidence)) confidence = "medium";
+    return {
+      questionNo,
+      branch,
+      topic: String(item.topic || "Genel").trim() || "Genel",
+      subTopic: String(item.subTopic || item.sub_topic || item.topic || "Genel").trim() || "Genel",
+      status,
+      keyTakeaway,
+      explanation: String(item.explanation || item.aiExplanation || "").trim(),
+      confidence,
+      importSource: "Gemini JSON"
+    };
+  }
+
+  window.checkGeminiImport = () => {
+    const status = $("geminiImportStatus");
+    const btn = $("checkGeminiImportBtn");
+    btn.disabled = true;
+    status.textContent = "JSON kontrol ediliyor…";
+    try {
+      const docs = splitTopLevelJsonDocuments($("geminiJsonInput").value);
+      const rawItems = docs.flatMap(doc => unpackGeminiItems(doc, []));
+      if (!rawItems.length) throw new Error('JSON içinde "items" dizisi veya soru kaydı bulunamadı.');
+
+      const normalized = rawItems.map((item, i) => normalizeGeminiImportItem(item, i));
+      const seen = new Set();
+      const unique = [];
+      let duplicateCount = 0;
+      normalized.forEach(item => {
+        const key = item.questionNo ? `${item.branch.toLocaleLowerCase("tr-TR")}|${item.questionNo}` : `${item.branch}|${item.subTopic}|${item.keyTakeaway}`;
+        if (seen.has(key)) { duplicateCount++; return; }
+        seen.add(key); unique.push(item);
+      });
+      pendingGeminiItems = unique;
+
+      const wrong = unique.filter(x => x.status === "wrong").length;
+      const empty = unique.filter(x => x.status === "empty").length;
+      const high = unique.filter(x => x.confidence === "high").length;
+      const uncertain = unique.length - high;
+      $("geminiImportSummary").innerHTML = `
+        <div class="stat-box"><span class="val">${unique.length}</span><span class="lbl">Toplam kayıt</span></div>
+        <div class="stat-box"><span class="val" style="color:var(--bad)">${wrong}</span><span class="lbl">Yanlış</span></div>
+        <div class="stat-box"><span class="val">${empty}</span><span class="lbl">Boş</span></div>
+        <div class="stat-box"><span class="val" style="color:var(--ok)">${high}</span><span class="lbl">Yüksek güven</span></div>
+      `;
+      $("geminiImportConfidenceNote").textContent = `${uncertain} orta/düşük güvenli kayıt varsayılan olarak aktarılmayacak.${duplicateCount ? ` ${duplicateCount} yinelenen kayıt önizlemeden çıkarıldı.` : ""} Kontrol ettikten sonra istersen bunları da dahil edebilirsin.`;
+      $("geminiImportListTitle").textContent = `Önizleme (${unique.length} kayıt)`;
+      $("geminiImportList").innerHTML = unique.slice(0, 25).map(item => `
+        <div class="card stack" style="padding:10px;gap:6px;">
+          <div class="result-head"><b>${esc(item.questionNo ? `Soru ${item.questionNo}` : item.subTopic)}</b><span class="meta">${item.status === "empty" ? "Boş" : "Yanlış"} · ${esc(item.confidence)}</span></div>
+          <div class="meta">${esc(item.branch)} · ${esc(item.topic)}</div>
+          <div class="spot">${fmt(item.keyTakeaway)}</div>
+        </div>
+      `).join("") + (unique.length > 25 ? `<div class="meta">İlk 25 kayıt gösteriliyor; toplam ${unique.length} kayıt kontrol edildi.</div>` : "");
+      $("saveGeminiImportBtn").textContent = "Seçilen kayıtları arşive aktar";
+      $("geminiImportPreview").classList.remove("hidden");
+      status.textContent = `✓ ${docs.length} JSON bloğu okundu. Kayıtları kontrol edebilirsin.`;
+    } catch (err) {
+      pendingGeminiItems = [];
+      $("geminiImportPreview").classList.add("hidden");
+      status.textContent = "JSON kontrol hatası: " + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  window.saveGeminiImport = async () => {
+    if (!pendingGeminiItems.length || analyzing) return;
+    const includeUncertain = $("includeUncertainGemini").checked;
+    const selected = pendingGeminiItems.filter(item => includeUncertain || item.confidence === "high");
+    if (!selected.length) { alert("Aktarılacak yüksek güvenli kayıt yok. Orta/düşük güvenli kayıtları dahil edebilirsin."); return; }
+    if (!confirm(`${selected.length} Gemini kaydı Deneme Yanlışları arşivine eklenecek. Mevcut Telegram kayıt akışı da kullanılacak. Devam edilsin mi?`)) return;
+
+    analyzing = true;
+    const btn = $("saveGeminiImportBtn");
+    btn.disabled = true;
+    btn.textContent = "Arşive aktarılıyor…";
+    try {
+      const label = ($("examNoteInput").value || "Gemini ile analiz edilen deneme").trim();
+      const result = await saveExtractedItemsList(selected, "exam", `${label} · Gemini JSON içe aktarma`);
+      await loadUserQuestions();
+      $("examResultCard").innerHTML = `
+        <div class="result-head"><h3>✓ Gemini sonuçları aktarıldı</h3><span class="meta" style="color:var(--ok)">${result.savedCount} yeni kayıt</span></div>
+        <div class="meta">${selected.length} kayıt işleme alındı. ${selected.length - result.savedCount} kayıt mevcut benzerlik kontrolü nedeniyle atlandı. Yanlış ve boş soru bilgileri arşivde korundu.</div>
+        ${result.htmlList.slice(0, 15).join('<hr class="batch-divider">')}
+        ${result.htmlList.length > 15 ? `<div class="meta">İlk 15 sonuç gösteriliyor.</div>` : ""}
+      `;
+      $("examResultCard").classList.remove("hidden");
+      $("geminiImportStatus").textContent = `✓ ${result.savedCount} yeni kayıt arşive aktarıldı.`;
+      $("geminiJsonInput").value = "";
+      pendingGeminiItems = [];
+      $("geminiImportPreview").classList.add("hidden");
+      $("includeUncertainGemini").checked = false;
+    } catch (err) {
+      console.error("Gemini içe aktarma hatası:", err);
+      $("geminiImportStatus").textContent = "Aktarma hatası: " + err.message;
+    } finally {
+      analyzing = false;
+      btn.disabled = false;
+      btn.textContent = "Seçilen kayıtları arşive aktar";
+    }
+  };
+
+  window.clearGeminiImport = () => {
+    pendingGeminiItems = [];
+    $("geminiJsonInput").value = "";
+    $("geminiImportPreview").classList.add("hidden");
+    $("geminiImportStatus").textContent = "";
+    $("includeUncertainGemini").checked = false;
+  };
+
   // ===================== ARŞİV VE FİLTRELER =====================
 
   window.loadUserQuestions = async () => {
@@ -1758,8 +1972,8 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     return Math.ceil(diff / DAY) + " gün sonra tekrar";
   }
 
-  function badgeForType(t) {
-    if (t === "exam") return `<span class="type-badge exam">🔥 Deneme</span>`;
+  function badgeForType(t, examStatus) {
+    if (t === "exam") return `<span class="type-badge exam">🔥 Deneme${examStatus === "empty" ? " · Boş" : examStatus === "wrong" ? " · Yanlış" : ""}</span>`;
     if (t === "spot") return `<span class="type-badge spot">📌 Spot</span>`;
     return `<span class="type-badge question">❓ Soru</span>`;
   }
@@ -1775,8 +1989,8 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     box.innerHTML = filtered.map(q => `
       <article class="card stack">
         <div>
-          <div class="item-title">${badgeForType(q.sourceType)}${esc(q.subTopic || q.topic || "Konu yok")}</div>
-          <div class="meta">${esc([q.branch, q.topic].filter(Boolean).join(", "))}</div>
+          <div class="item-title">${badgeForType(q.sourceType, q.examStatus)}${esc(q.subTopic || q.topic || "Konu yok")}</div>
+          <div class="meta">${esc([q.branch, q.topic].filter(Boolean).join(", "))}${q.confidence ? ` · Güven: ${esc(q.confidence)}` : ""}</div>
         </div>
         <div class="spot">${fmt(q.keyTakeaway)}</div>
         <div class="item-foot">

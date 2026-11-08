@@ -1,3 +1,227 @@
+
+
+
+1. deneme: Net 5
+2. deneme: Net 6
+3. deneme: Net 7
+4. deneme: Net 9
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -161,6 +385,22 @@
     .weak-item + .weak-item { margin-top: 6px; }
     .branch-row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
     .branch-row:last-child { border-bottom: 0; }
+    .trend-list { display: grid; gap: 9px; margin-top: 10px; }
+    .trend-row { display: grid; grid-template-columns: minmax(88px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 13px; }
+    .trend-track { height: 9px; background: var(--raised); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+    .trend-fill { height: 100%; background: var(--accent); border-radius: 99px; min-width: 2px; }
+    .trend-table-wrap { overflow-x: auto; margin-top: 10px; }
+    .trend-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+    .trend-table th, .trend-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+    .trend-table th:first-child, .trend-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
+    .trend-table th { color: var(--muted); font-weight: 600; }
+    .trend-up { color: var(--ok); font-weight: 700; }
+    .trend-down { color: var(--bad); font-weight: 700; }
+    .trend-flat { color: var(--muted); font-weight: 650; }
+    .trend-chips { display: flex; gap: 4px; justify-content: flex-end; }
+    .trend-chip { min-width: 30px; padding: 3px 5px; background: var(--raised); border-radius: 6px; text-align: center; }
+    .recommendation-item { padding: 9px 11px; background: var(--raised); border-radius: 9px; font-size: 13.5px; }
+    .recommendation-item + .recommendation-item { margin-top: 7px; }
 
     .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
@@ -218,11 +458,6 @@
 
     <!-- 1. SEKME: SORU / SPOT EKLE -->
     <section id="sectionAdd">
-      <div class="seg" role="group" aria-label="Model">
-        <button id="modelFlash" class="on" onclick="setModel('gemini-3.8-flash')">Flash, hızlı</button>
-        <button id="modelPro" onclick="setModel('gemini-3.8-pro')">Pro, derin vaka</button>
-      </div>
-
       <div class="seg" role="group" aria-label="Eklenme modu">
         <button id="modeQuestion" onclick="setInputMode('question')">Soru çözümle</button>
         <button id="modeSpot" onclick="setInputMode('spot')">Spot çıkar</button>
@@ -250,6 +485,7 @@
           <div class="status-row" id="scanStatus"></div>
           <button class="link danger" onclick="clearImage()">Görseli Kaldır</button>
         </div>
+        <div id="analysisStatus" class="status-row hidden" role="status" aria-live="polite"></div>
       </div>
 
       <div class="card stack">
@@ -309,6 +545,28 @@
           <div class="meta">Yüklediğin deneme karnelerinde en çok yanlış/boş çıkan alt konular</div>
         </div>
         <div id="weakTopicsList"></div>
+      </div>
+
+      <!-- Deneme performans ve ders neti takibi -->
+      <div id="examAnalyticsDashboard" class="card stack hidden">
+        <div>
+          <h2 class="card-title">📈 Deneme performansın</h2>
+          <div class="meta">Kayıtlı denemelerinden hesaplanan genel gelişim ve ders netleri</div>
+        </div>
+        <div id="examOverviewStats" class="stat-grid"></div>
+        <div>
+          <h3 class="card-title">Toplam net gelişimi</h3>
+          <div id="examNetTrend" class="trend-list"></div>
+        </div>
+        <div>
+          <h3 class="card-title">Ders bazında net takibi</h3>
+          <div class="meta">Son deneme, önceki deneme ve son 5 denemedeki netlerin</div>
+          <div id="branchTrendTable" class="trend-table-wrap"></div>
+        </div>
+        <div>
+          <h3 class="card-title">🎯 Son denemeye göre çalışma önceliği</h3>
+          <div id="examRecommendations"></div>
+        </div>
       </div>
 
       <!-- Kayıtlı Deneme Karneleri Geçmişi -->
@@ -433,8 +691,8 @@
   const BOT_API_URL = "https://tus-telegram-bot.medetarikurt.workers.dev";
   const COL = "tus_questions";
   const EXAM_COL = "tus_exams";
-  const MAX_STREAK = 3;
-  const INTERVAL_DAYS = [1, 3];
+  const MAX_STREAK = 6;
+  const INTERVAL_DAYS = [1, 3, 7, 14, 30];
   const DAY = 86400000;
 
   const app = initializeApp(firebaseConfig);
@@ -443,7 +701,6 @@
 
   let selectedImageBase64 = null, selectedImageMime = null;
   let examImageBase64 = null, examImageMime = null, examPdfText = null;
-  let currentModel = "gemini-3.8-flash";
   let allQuestions = [];
   let allExams = [];
   let selectedBranchFilter = "All";
@@ -557,11 +814,18 @@
   }
 
   async function callWorker(body) {
-    const res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error(res.status === 429 ? "Ücretsiz kota doldu, biraz sonra tekrar dene." : "Sunucu hatası (" + res.status + ")");
+    const payload = { ...body, task: body.task || "question_analyze" };
+    const res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      let detail = "";
+      try { const errData = await res.json(); detail = errData.error?.message || errData.message || ""; } catch (e) {}
+      throw new Error(res.status === 429 ? "Ücretsiz kota doldu, biraz sonra tekrar dene." : detail || "Sunucu hatası (" + res.status + ")");
+    }
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Yapay zeka yanıtı alınamadı.");
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+      || data.content?.filter?.(block => block.type === "text").map(block => block.text).join("\n")
+      || data.text;
+    if (!text) throw new Error(data.error?.message || "Yapay zeka yanıtı alınamadı.");
     return text;
   }
 
@@ -577,14 +841,16 @@
     window.scrollTo({ top: 0 });
   };
 
-  window.setModel = (model) => {
-    currentModel = model;
-    const isPro = model.includes("pro");
-    $("modelFlash").classList.toggle("on", !isPro);
-    $("modelPro").classList.toggle("on", isPro);
-  };
+  function setAnalysisStatus(message, kind = "info") {
+    const el = $("analysisStatus");
+    if (!message) { el.textContent = ""; el.classList.add("hidden"); return; }
+    el.textContent = message;
+    el.style.color = kind === "success" ? "var(--ok)" : kind === "error" ? "var(--bad)" : "var(--muted)";
+    el.classList.remove("hidden");
+  }
 
   window.setInputMode = (mode) => {
+    setAnalysisStatus("");
     currentInputMode = mode === "spot" ? "spot" : "question";
     const spotOnly = currentInputMode === "spot";
     $("modeQuestion").classList.toggle("on", !spotOnly);
@@ -654,13 +920,111 @@
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = "";
+    let emptyPages = 0;
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const strings = content.items.map(item => item.str);
-      fullText += `\n--- Sayfa ${i} ---\n` + strings.join(" ");
+      const strings = content.items.map(item => item.str).filter(Boolean);
+      const pageText = strings.join(" ").trim();
+      if (pageText.length < 12) emptyPages++;
+      fullText += `\n--- Sayfa ${i} ---\n` + pageText;
     }
-    return { text: fullText.trim(), numPages: pdf.numPages };
+    return { text: fullText.trim(), numPages: pdf.numPages, emptyPages };
+  }
+
+  function splitPdfIntoAnalysisChunks(fullText, maxChars = 9500) {
+    const pages = String(fullText || "").split(/(?=--- Sayfa \d+ ---)/g).map(x => x.trim()).filter(Boolean);
+    if (pages.length <= 1) {
+      const chunks = [];
+      for (let i = 0; i < fullText.length; i += maxChars) chunks.push(fullText.slice(i, i + maxChars));
+      return chunks;
+    }
+    const chunks = [];
+    let current = "";
+    for (const page of pages) {
+      if (current && (current.length + page.length + 2) > maxChars) {
+        chunks.push(current);
+        current = page;
+      } else {
+        current = current ? current + "\n\n" + page : page;
+      }
+    }
+    if (current) chunks.push(current);
+    return chunks;
+  }
+
+  function finiteNumber(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number(String(value).replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function mergeExamAnalyses(parts, fallbackTitle) {
+    const valid = parts.filter(Boolean);
+    if (!valid.length) throw new Error("PDF analizinden sonuç alınamadı.");
+    const firstValue = key => {
+      const hit = valid.find(p => p[key] !== null && p[key] !== undefined && p[key] !== "");
+      return hit ? hit[key] : null;
+    };
+    const branchMap = new Map();
+    const weakMap = new Map();
+    valid.forEach(part => {
+      (Array.isArray(part.branches) ? part.branches : []).forEach(b => {
+        if (!b || !b.branch) return;
+        const key = String(b.branch).trim();
+        const existing = branchMap.get(key) || { branch: key, correct: 0, wrong: 0, blank: 0, hasCounts: false, netValues: [] };
+        const c = finiteNumber(b.correct), w = finiteNumber(b.wrong), bl = finiteNumber(b.blank);
+        if (c !== null || w !== null || bl !== null) {
+          existing.correct += c || 0; existing.wrong += w || 0; existing.blank += bl || 0;
+          existing.hasCounts = true;
+        }
+        const net = finiteNumber(b.net);
+        if (net !== null) existing.netValues.push(net);
+        branchMap.set(key, existing);
+      });
+      (Array.isArray(part.weakSubTopics) ? part.weakSubTopics : []).forEach(w => {
+        if (!w || !w.subTopic) return;
+        const key = `${String(w.branch || "Genel").trim()}|${String(w.subTopic).trim()}`;
+        const existing = weakMap.get(key) || { branch: w.branch || "Genel", subTopic: w.subTopic, correct: 0, wrong: 0, blank: 0, hasCounts: false };
+        const c = finiteNumber(w.correct), wr = finiteNumber(w.wrong), bl = finiteNumber(w.blank);
+        if (c !== null || wr !== null || bl !== null) {
+          existing.correct += c || 0; existing.wrong += wr || 0; existing.blank += bl || 0;
+          existing.hasCounts = true;
+        }
+        weakMap.set(key, existing);
+      });
+    });
+
+    const branches = [...branchMap.values()].map(b => {
+      const net = b.hasCounts ? b.correct - b.wrong / 4 : (b.netValues.length ? b.netValues[0] : 0);
+      return { branch: b.branch, correct: b.hasCounts ? b.correct : 0, wrong: b.hasCounts ? b.wrong : 0, blank: b.hasCounts ? b.blank : 0, net: Math.round(net * 100) / 100 };
+    });
+    const weakSubTopics = [...weakMap.values()].map(w => ({
+      branch: w.branch, subTopic: w.subTopic,
+      correct: w.correct, wrong: w.wrong, blank: w.blank,
+      net: Math.round((w.correct - w.wrong / 4) * 100) / 100
+    }));
+
+    const sumField = field => branches.reduce((sum, b) => sum + (finiteNumber(b[field]) || 0), 0);
+    const suppliedCorrect = finiteNumber(firstValue("totalCorrect"));
+    const suppliedWrong = finiteNumber(firstValue("totalWrong"));
+    const suppliedBlank = finiteNumber(firstValue("totalBlank"));
+    const totalCorrect = suppliedCorrect !== null ? suppliedCorrect : sumField("correct");
+    const totalWrong = suppliedWrong !== null ? suppliedWrong : sumField("wrong");
+    const totalBlank = suppliedBlank !== null ? suppliedBlank : sumField("blank");
+    const suppliedNet = finiteNumber(firstValue("totalNet"));
+    const totalNet = (suppliedCorrect !== null && suppliedWrong !== null)
+      ? totalCorrect - totalWrong / 4
+      : (suppliedNet !== null ? suppliedNet : sumField("net"));
+    const title = firstValue("examTitle") || fallbackTitle || "TUS Deneme Sınavı";
+    const date = firstValue("examDate") || new Date().toLocaleDateString("tr-TR");
+    const score = finiteNumber(firstValue("score"));
+    const advice = firstValue("coachAdvice") || "";
+    return {
+      examTitle: title, examDate: date, score: score === null ? 0 : score,
+      totalNet: Math.round(totalNet * 100) / 100,
+      totalCorrect, totalWrong, totalBlank, branches, weakSubTopics, coachAdvice: advice
+    };
   }
 
   window.handleExamFileSelect = async (event, type) => {
@@ -673,9 +1037,15 @@
       $("examImagePreview").classList.add("hidden");
       $("examScanStatus").innerHTML = `<span class="spin"></span><span>PDF sayfaları okunuyor…</span>`;
       try {
-        const { text, numPages } = await extractTextFromPdf(file);
+        const { text, numPages, emptyPages } = await extractTextFromPdf(file);
         examPdfText = text;
-        $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${ esc(file.name) } (${numPages} sayfa metni okundu)</span>`;
+        if (!text || text.length < 40 || emptyPages === numPages) {
+          examPdfText = null;
+          $("examScanStatus").innerHTML = `<span style="color:var(--bad);">PDF'de seçilebilir metin bulunamadı. Bu muhtemelen taranmış bir PDF. Sonuç karnesinin ekran görüntüsünü yükleyebilirsin.</span>`;
+        } else {
+          const warning = emptyPages > 0 ? ` • ${emptyPages} boş/metinsiz sayfa` : "";
+          $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${esc(file.name)} (${numPages} sayfa okundu${warning})</span>`;
+        }
       } catch (err) {
         console.error("PDF okuma hatası:", err);
         $("examScanStatus").innerHTML = `<span style="color:var(--bad);">PDF okunamadı: ${esc(err.message)}</span>`;
@@ -716,19 +1086,28 @@
 
     try {
       if (currentExamMode === "report") {
-        // MOD A: SONUÇ KARNESİ ANALİZİ (TUSMER PDF / EKRAN GÖRÜNTÜSÜ)
-        const prompt = `
-Sen uzman bir TUS koçusun. Aşağıdaki TUS deneme sınavı sonuç karnesini (metin veya görsel) detaylıca analiz et.
-Görevin:
-1. Sınav adını/tarihini, toplam doğru, yanlış, boş, net ve puanı çıkar.
-2. Ders bazında (Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji, Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar) doğru, yanlış, boş ve net sayılarını çıkar.
-3. Karnede "Konulara göre ayrıntılar" (alt konular) varsa, özellikle YANLIŞ veya BOŞ yapılan (neti düşük veya eksi olan) alt konuları "weakSubTopics" dizisine ekle (Örn: Sinir Sistemi Anatomisi 1D 3Y, Otonom Farmakoloji 0D 2Y gibi).
-4. Kısa, vurucu bir koçluk tavsiyesi ("coachAdvice") yaz.
+        // MOD A: PDF metnini sayfa grupları halinde analiz et; görsel kitapçık akışına dokunulmadı.
+        if (examPdfText) {
+          const chunks = splitPdfIntoAnalysisChunks(examPdfText, 9500);
+          const analyses = [];
+          for (let i = 0; i < chunks.length; i++) {
+            btn.textContent = chunks.length > 1 ? `Karne analiz ediliyor (${i + 1}/${chunks.length})…` : "Karne analiz ediliyor…";
+            const prompt = `
+Sen uzman bir TUS koçusun. Aşağıdaki PDF sayfa grubunu dikkatle oku ve SADECE bu metinde açıkça gördüğün deneme sonuçlarını çıkar.
+ÖNEMLİ KURALLAR:
+- Görmediğin sayısal değeri tahmin etme; bulunmayan alanlar için null kullan.
+- Bu parçada görünmeyen toplam sınav bilgilerini null bırak. Başka sayfalarda olabilecek veriyi uydurma.
+- branches dizisine yalnızca bu parçada açıkça bulunan ders satırlarını ekle.
+- weakSubTopics dizisine bu parçada açıkça belirtilen yanlış/boş alt konuları ekle.
+- Net hesabı TUS kuralına göre doğru - yanlış/4 şeklindedir.
+- Ders adlarını şu isimlerle standartlaştır: Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji, Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar.
+- Sayısal değerleri sayı olarak yaz; emin değilsen null yaz.
+- coachAdvice alanını boş bırak; çalışma önceliğini birleştirilmiş veriden uygulama hesaplayacak.
 
-SADECE aşağıdaki geçerli JSON formatında yanıt ver:
+SADECE geçerli JSON döndür:
 {
-  "examTitle": "Sınav Adı (Örn: TUSMER Kasım 2026 Denemesi)",
-  "examDate": "Tarih (Örn: 08.11.2026)",
+  "examTitle": "Görünen sınav adı veya null",
+  "examDate": "Görünen tarih veya null",
   "score": 68.96,
   "totalNet": 55.5,
   "totalCorrect": 63,
@@ -740,58 +1119,71 @@ SADECE aşağıdaki geçerli JSON formatında yanıt ver:
   "weakSubTopics": [
     { "branch": "Anatomi", "subTopic": "Sinir Sistemi", "correct": 1, "wrong": 3, "blank": 1, "net": 0.25 }
   ],
-  "coachAdvice": "2-3 cümlelik net stratejik analiz ve çalışma önerisi."
+  "coachAdvice": ""
 }
-Kullanıcı Notu: ${note}
-Karne Metni:
-${examPdfText ? examPdfText.substring(0, 28000) : "(Görselde)"}
+Sayfa grubu ${i + 1}/${chunks.length}.
+Kullanıcı notu: ${note}
+PDF metni:
+${chunks[i]}
 `;
-        const raw = await callWorker({ prompt, model: currentModel, imageBase64: examImageBase64, mimeType: examImageMime });
-        const parsed = extractCleanJSON(raw);
+            const raw = await callWorker({ task: "exam_report", prompt });
+            analyses.push(extractCleanJSON(raw));
+          }
+          const merged = mergeExamAnalyses(analyses, note || "TUS Deneme Sınavı");
+          const examDoc = { ...merged, createdAtMs: Date.now() };
+          const ref = await addDoc(collection(db, EXAM_COL), examDoc);
+          allExams.unshift({ id: ref.id, ...examDoc });
+          renderExams();
 
-        if (!parsed || (!parsed.branches && !parsed.totalNet)) {
-          throw new Error("Karne verisi okunamadı. Lütfen geçerli bir sonuç belgesi yükle.");
-        }
-
-        const examDoc = {
-          examTitle: parsed.examTitle || note || "TUS Deneme Sınavı",
-          examDate: parsed.examDate || new Date().toLocaleDateString("tr-TR"),
-          score: Number(parsed.score) || 0,
-          totalNet: Number(parsed.totalNet) || 0,
-          totalCorrect: Number(parsed.totalCorrect) || 0,
-          totalWrong: Number(parsed.totalWrong) || 0,
-          totalBlank: Number(parsed.totalBlank) || 0,
-          branches: Array.isArray(parsed.branches) ? parsed.branches : [],
-          weakSubTopics: Array.isArray(parsed.weakSubTopics) ? parsed.weakSubTopics : [],
-          coachAdvice: parsed.coachAdvice || "",
-          createdAtMs: Date.now()
-        };
-
-        const ref = await addDoc(collection(db, EXAM_COL), examDoc);
-        allExams.unshift({ id: ref.id, ...examDoc });
-        renderExams();
-
-        const resCard = $("examResultCard");
-        resCard.innerHTML = `
-          <div class="result-head">
-            <div>
-              <h3>${esc(examDoc.examTitle)}</h3>
-              <div class="meta">${esc(examDoc.examDate)} • Puan: <b>${examDoc.score}</b></div>
+          const resCard = $("examResultCard");
+          resCard.innerHTML = `
+            <div class="result-head">
+              <div>
+                <h3>${esc(examDoc.examTitle)}</h3>
+                <div class="meta">${esc(examDoc.examDate)} • Puan: <b>${examDoc.score || "—"}</b></div>
+              </div>
+              <span class="meta" style="color:var(--ok)">✓ Karne Kaydedildi</span>
             </div>
-            <span class="meta" style="color:var(--ok)">✓ Karne Kaydedildi</span>
-          </div>
-          <div class="stat-grid">
-            <div class="stat-box"><span class="val">${examDoc.totalNet}</span><span class="lbl">Net</span></div>
-            <div class="stat-box"><span class="val" style="color:var(--ok)">${examDoc.totalCorrect}</span><span class="lbl">Doğru</span></div>
-            <div class="stat-box"><span class="val" style="color:var(--bad)">${examDoc.totalWrong}</span><span class="lbl">Yanlış</span></div>
-            <div class="stat-box"><span class="val">${examDoc.totalBlank}</span><span class="lbl">Boş</span></div>
-          </div>
-          ${examDoc.coachAdvice ? `<div class="spot">${fmt(examDoc.coachAdvice)}</div>` : ""}
-        `;
-        resCard.classList.remove("hidden");
-        clearExamFile();
-        $("examNoteInput").value = "";
-
+            <div class="stat-grid">
+              <div class="stat-box"><span class="val">${examDoc.totalNet}</span><span class="lbl">Net</span></div>
+              <div class="stat-box"><span class="val" style="color:var(--ok)">${examDoc.totalCorrect}</span><span class="lbl">Doğru</span></div>
+              <div class="stat-box"><span class="val" style="color:var(--bad)">${examDoc.totalWrong}</span><span class="lbl">Yanlış</span></div>
+              <div class="stat-box"><span class="val">${examDoc.totalBlank}</span><span class="lbl">Boş</span></div>
+            </div>
+            <div class="meta">${chunks.length} analiz bölümü birleştirildi. Ders netleri D − Y/4 formülüyle hesaplandı.</div>
+          `;
+          resCard.classList.remove("hidden");
+          clearExamFile();
+          $("examNoteInput").value = "";
+        } else if (examImageBase64) {
+          const prompt = `
+Sen uzman bir TUS koçusun. Aşağıdaki sonuç karnesi görselini analiz et. Yalnızca görselde açıkça okunan verileri çıkar; emin olmadığın alanlara null yaz, tahmin etme.
+Ders neti = doğru - yanlış/4.
+SADECE geçerli JSON döndür:
+{
+  "examTitle":"Sınav adı veya null", "examDate":"Tarih veya null", "score":null,
+  "totalNet":null, "totalCorrect":null, "totalWrong":null, "totalBlank":null,
+  "branches":[{"branch":"Anatomi","correct":3,"wrong":8,"blank":2,"net":1}],
+  "weakSubTopics":[{"branch":"Anatomi","subTopic":"Sinir Sistemi","correct":1,"wrong":3,"blank":1,"net":0.25}],
+  "coachAdvice":""
+}
+Kullanıcı notu: ${note}
+`;
+          const raw = await callWorker({ task: "exam_report", prompt, imageBase64: examImageBase64, mimeType: examImageMime });
+          const parsed = extractCleanJSON(raw);
+          if (!parsed || (!parsed.branches && parsed.totalNet === null && parsed.totalCorrect === null)) throw new Error("Karne verisi okunamadı. Lütfen daha net bir görsel yükle.");
+          const examDoc = { ...mergeExamAnalyses([parsed], note || "TUS Deneme Sınavı"), createdAtMs: Date.now() };
+          const ref = await addDoc(collection(db, EXAM_COL), examDoc);
+          allExams.unshift({ id: ref.id, ...examDoc });
+          renderExams();
+          const resCard = $("examResultCard");
+          resCard.innerHTML = `<div class="result-head"><div><h3>${esc(examDoc.examTitle)}</h3><div class="meta">${esc(examDoc.examDate)} • Puan: <b>${examDoc.score || "—"}</b></div></div><span class="meta" style="color:var(--ok)">✓ Karne Kaydedildi</span></div><div class="stat-grid"><div class="stat-box"><span class="val">${examDoc.totalNet}</span><span class="lbl">Net</span></div><div class="stat-box"><span class="val">${examDoc.totalCorrect}</span><span class="lbl">Doğru</span></div><div class="stat-box"><span class="val">${examDoc.totalWrong}</span><span class="lbl">Yanlış</span></div><div class="stat-box"><span class="val">${examDoc.totalBlank}</span><span class="lbl">Boş</span></div></div>`;
+          resCard.classList.remove("hidden");
+          clearExamFile();
+          $("examNoteInput").value = "";
+        } else {
+          throw new Error("Karne PDF metni veya görseli bulunamadı. Lütfen dosyayı yeniden seç.");
+        }
       } else {
         // MOD B: ÇÖZÜLMÜŞ KİTAPÇIK SAYFASI (+/- İŞARETLİ SORULAR)
         const prompt = `
@@ -816,7 +1208,7 @@ SADECE aşağıdaki geçerli JSON formatında yanıt ver:
 }
 Kullanıcı Notu: ${note}
 `;
-        const raw = await callWorker({ prompt, model: currentModel, imageBase64: examImageBase64, mimeType: examImageMime });
+        const raw = await callWorker({ task: "exam_booklet", prompt, imageBase64: examImageBase64, mimeType: examImageMime });
         const rawParsed = extractCleanJSON(raw);
         const items = Array.isArray(rawParsed) ? rawParsed : (Array.isArray(rawParsed?.items) ? rawParsed.items : (rawParsed?.branch ? [rawParsed] : []));
 
@@ -865,6 +1257,78 @@ Kullanıcı Notu: ${note}
     renderExams();
   };
 
+  function renderExamAnalyticsDashboard() {
+    const dashboard = $("examAnalyticsDashboard");
+    if (!allExams.length) { dashboard.classList.add("hidden"); return; }
+    dashboard.classList.remove("hidden");
+
+    const ordered = [...allExams].sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+    const latest = ordered[ordered.length - 1];
+    const previous = ordered.length > 1 ? ordered[ordered.length - 2] : null;
+    const nets = ordered.map(e => finiteNumber(e.totalNet)).filter(v => v !== null);
+    const average = nets.length ? nets.reduce((a, b) => a + b, 0) / nets.length : 0;
+    const best = nets.length ? Math.max(...nets) : 0;
+    const latestNet = finiteNumber(latest.totalNet) || 0;
+    const latestWrong = finiteNumber(latest.totalWrong) || 0;
+    const latestBlank = finiteNumber(latest.totalBlank) || 0;
+    const delta = previous ? latestNet - (finiteNumber(previous.totalNet) || 0) : null;
+
+    $("examOverviewStats").innerHTML = `
+      <div class="stat-box"><span class="val">${allExams.length}</span><span class="lbl">Deneme</span></div>
+      <div class="stat-box"><span class="val">${latestNet.toFixed(2)}</span><span class="lbl">Son net</span></div>
+      <div class="stat-box"><span class="val">${average.toFixed(2)}</span><span class="lbl">Net ortalaması</span></div>
+      <div class="stat-box"><span class="val">${best.toFixed(2)}</span><span class="lbl">En yüksek net</span></div>`;
+
+    const recent = ordered.slice(-5);
+    const maxNet = Math.max(1, ...recent.map(e => finiteNumber(e.totalNet) || 0));
+    $("examNetTrend").innerHTML = recent.map(ex => {
+      const n = finiteNumber(ex.totalNet) || 0;
+      const width = Math.max(1, Math.min(100, n / maxNet * 100));
+      return `<div class="trend-row"><span title="${esc(ex.examTitle || "Deneme")}">${esc((ex.examTitle || "Deneme").slice(0, 18))}</span><div class="trend-track"><div class="trend-fill" style="width:${width}%"></div></div><b>${n.toFixed(2)}</b></div>`;
+    }).join("");
+
+    const branchOrder = ["Anatomi", "Fizyoloji", "Biyokimya", "Mikrobiyoloji", "Patoloji", "Farmakoloji", "Dahiliye", "Pediatri", "Genel Cerrahi", "Kadın Doğum", "Küçük Stajlar"];
+    const names = new Set();
+    recent.forEach(ex => (ex.branches || []).forEach(b => { if (b.branch) names.add(b.branch); }));
+    const orderedNames = [...names].sort((a, b) => {
+      const ia = branchOrder.indexOf(a), ib = branchOrder.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, "tr");
+    });
+    const previousBranches = new Map((previous?.branches || []).map(b => [b.branch, finiteNumber(b.net)]));
+    const latestBranches = new Map((latest.branches || []).map(b => [b.branch, finiteNumber(b.net)]));
+    const columns = recent.map((ex, i) => `<th title="${esc(ex.examTitle || "Deneme")}">${i + 1}</th>`).join("");
+    const rows = orderedNames.map(name => {
+      const vals = recent.map(ex => {
+        const b = (ex.branches || []).find(x => x.branch === name);
+        return b ? finiteNumber(b.net) : null;
+      });
+      const cur = latestBranches.get(name);
+      const prev = previousBranches.get(name);
+      const change = cur !== null && cur !== undefined && prev !== null && prev !== undefined ? cur - prev : null;
+      const changeLabel = change === null ? "—" : `${change > 0 ? "+" : ""}${change.toFixed(2)}`;
+      const changeClass = change === null ? "trend-flat" : change > 0 ? "trend-up" : change < 0 ? "trend-down" : "trend-flat";
+      return `<tr><td><b>${esc(name)}</b></td><td>${cur === null || cur === undefined ? "—" : cur.toFixed(2)}</td><td class="${changeClass}">${changeLabel}</td><td><div class="trend-chips">${vals.map(v => `<span class="trend-chip">${v === null ? "—" : v.toFixed(1)}</span>`).join("")}</div></td></tr>`;
+    }).join("");
+    $("branchTrendTable").innerHTML = orderedNames.length
+      ? `<table class="trend-table"><thead><tr><th>Ders</th><th>Son net</th><th>Fark</th><th>Son ${recent.length} deneme</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="empty">Ders bazında net verisi henüz bulunmuyor. Yüklediğin karnede ders dağılımı bulunmalı.</div>`;
+
+    const priorities = (latest.branches || []).map(b => ({
+      branch: b.branch,
+      wrong: finiteNumber(b.wrong) || 0,
+      blank: finiteNumber(b.blank) || 0,
+      net: finiteNumber(b.net) || 0,
+      score: (finiteNumber(b.wrong) || 0) * 1.25 + (finiteNumber(b.blank) || 0)
+    })).sort((a, b) => b.score - a.score).filter(x => x.score > 0).slice(0, 3);
+    const weakSubs = (latest.weakSubTopics || []).filter(w => (finiteNumber(w.wrong) || 0) + (finiteNumber(w.blank) || 0) > 0)
+      .sort((a, b) => ((finiteNumber(b.wrong) || 0) * 1.25 + (finiteNumber(b.blank) || 0)) - ((finiteNumber(a.wrong) || 0) * 1.25 + (finiteNumber(a.blank) || 0))).slice(0, 4);
+    const advice = priorities.length
+      ? priorities.map((p, i) => `<div class="recommendation-item"><b>${i + 1}. ${esc(p.branch)}</b> — ${p.wrong} yanlış, ${p.blank} boş. Bu derse tekrar ve soru çözümü için öncelik ver.</div>`).join("")
+      : `<div class="meta">Son denemede ders bazında yanlış/boş verisi bulunamadı.</div>`;
+    const subAdvice = weakSubs.length ? `<div class="meta" style="margin:10px 0 6px;">Öne çıkan alt konular</div>${weakSubs.map(w => `<div class="recommendation-item">${esc(w.branch || "Genel")} · <b>${esc(w.subTopic)}</b> — ${(finiteNumber(w.wrong) || 0)} yanlış / ${(finiteNumber(w.blank) || 0)} boş</div>`).join("")}` : "";
+    $("examRecommendations").innerHTML = advice + subAdvice + (delta === null ? "" : `<div class="meta" style="margin-top:10px;">Önceki denemeye göre genel net farkı: <b class="${delta > 0 ? "trend-up" : delta < 0 ? "trend-down" : "trend-flat"}">${delta > 0 ? "+" : ""}${delta.toFixed(2)}</b>. Son denemede ${latestWrong} yanlış ve ${latestBlank} boş bulunuyor.</div>`);
+  }
+
   function renderExams() {
     $("examHistoryCount").textContent = `${allExams.length} deneme`;
     const box = $("examsList");
@@ -874,8 +1338,10 @@ Kullanıcı Notu: ${note}
     if (!allExams.length) {
       box.innerHTML = `<div class="empty">Henüz deneme karnesi yüklenmedi.</div>`;
       radarCard.classList.add("hidden");
+      $("examAnalyticsDashboard").classList.add("hidden");
       return;
     }
+    renderExamAnalyticsDashboard();
 
     // Tüm denemelerdeki zayıf alt konuları birleştir ve sırala
     const subMap = {};
@@ -945,10 +1411,17 @@ Kullanıcı Notu: ${note}
     return inter / (A.size + B.size - inter);
   }
   function findDuplicate(p) {
-    const sub = (p.subTopic || "").trim().toLowerCase();
-    return allQuestions.find(q =>
-      (sub && (q.subTopic || "").trim().toLowerCase() === sub && q.branch === p.branch && similarity(q.keyTakeaway, p.keyTakeaway) >= 0.45) ||
-      similarity(q.keyTakeaway, p.keyTakeaway) >= 0.60);
+    const sub = (p.subTopic || "").trim().toLocaleLowerCase("tr-TR");
+    const topic = (p.topic || "").trim().toLocaleLowerCase("tr-TR");
+    const branch = (p.branch || "").trim().toLocaleLowerCase("tr-TR");
+    if (!branch) return null;
+    return allQuestions.find(q => {
+      if ((q.branch || "").trim().toLocaleLowerCase("tr-TR") !== branch) return false;
+      const sameSub = sub && (q.subTopic || "").trim().toLocaleLowerCase("tr-TR") === sub;
+      const sameTopic = topic && (q.topic || "").trim().toLocaleLowerCase("tr-TR") === topic;
+      const score = similarity(q.keyTakeaway, p.keyTakeaway);
+      return (sameSub && score >= 0.42) || (sameTopic && score >= 0.62) || score >= 0.78;
+    });
   }
 
   async function saveExtractedItemsList(items, sourceType, rawTextLabel) {
@@ -1035,19 +1508,22 @@ Kullanıcı Notu: ${note}
     if (!questionText && !selectedImageBase64) { alert("Önce sorunun fotoğrafını çek ya da metni yaz."); return; }
 
     analyzing = true;
+    setAnalysisStatus("Yapay zekâ içeriği inceliyor…");
     const btn = $("analyzeBtn");
     btn.disabled = true; btn.textContent = "Analiz ediliyor…";
     if (selectedImageBase64) $("scanStatus").innerHTML = `<span class="spin"></span><span>Yapay Zeka Çözüyor…</span>`;
 
-    const chunks = selectedImageBase64 ? [questionText] : splitTextIntoChunks(questionText, 900);
     const spotOnlyMode = currentInputMode === "spot";
+    // Soru modu tek bir soru olarak kalır; yalnızca açıkça seçilen spot modunda toplu metin bölünür.
+    const chunks = (selectedImageBase64 || !spotOnlyMode) ? [questionText] : splitTextIntoChunks(questionText, 900);
     let allExtractedItems = [];
 
     try {
       for (let c = 0; c < chunks.length; c++) {
         if (chunks.length > 1) btn.textContent = `Bölüm analiz ediliyor (${c + 1}/${chunks.length})…`;
         const chunkText = chunks[c];
-        const isMultiMode = !selectedImageBase64 && chunkText.length > 220;
+        // Kullanıcı soru çözümlemeyi seçtiyse metin uzunluğundan bağımsız olarak soru çözümle.
+        const isMultiMode = false;
 
         const prompt = spotOnlyMode ? `
 Sen uzman bir TUS hocasısın. Gönderilen görseli veya metni incele ve içindeki TUS açısından değerli bilgileri kısa, bağımsız spotlara dönüştür.
@@ -1099,7 +1575,8 @@ Cevabı KESİNLİKLE sadece aşağıdaki geçerli JSON formatında ver:
 Kullanıcı Notu / Soru Metni: ${chunkText}
 `;
 
-        const text = await callWorker({ prompt, model: currentModel, imageBase64: selectedImageBase64, mimeType: selectedImageMime });
+        const task = spotOnlyMode ? (selectedImageBase64 ? "spot_extract_image" : "spot_extract_text") : "question_analyze";
+        const text = await callWorker({ task, prompt, imageBase64: selectedImageBase64, mimeType: selectedImageMime });
         const rawParsed = extractCleanJSON(text);
 
         let chunkItems = [];
@@ -1138,11 +1615,13 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       clearImage();
       await loadUserQuestions();
       if (spotOnlyMode) {
-        $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${savedCount} yeni spot kaydedildi.</span>`;
+        setAnalysisStatus(`${savedCount} yeni spot kaydedildi.`, "success");
+      } else {
+        setAnalysisStatus(`${savedCount} yeni kayıt oluşturuldu.`, "success");
       }
     } catch (err) {
       console.error("Analiz hatası:", err);
-      if (selectedImageBase64) $("scanStatus").textContent = "Analiz başarısız. Lütfen tekrar dene.";
+      setAnalysisStatus("Analiz başarısız: " + err.message, "error");
       alert("Çözüm sırasında hata oluştu: " + err.message);
     } finally {
       analyzing = false;
@@ -1328,7 +1807,23 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       opts.forEach((v, i) => { o[String.fromCharCode(65 + i)] = typeof v === "object" ? Object.values(v)[0] : v; });
       return o;
     }
-    return opts;
+    if (typeof opts === "object") {
+      const normalized = {};
+      Object.entries(opts).forEach(([key, value]) => { normalized[String(key).trim().toUpperCase()] = value; });
+      return normalized;
+    }
+    return null;
+  }
+
+  function validateGeneratedQuestion(item) {
+    if (!item || typeof item !== "object") return null;
+    const separated = separateQuestionOptions(item.question, item.options);
+    const options = separated.options || {};
+    const keys = ["A", "B", "C", "D", "E"];
+    if (!separated.question || keys.some(k => typeof options[k] !== "string" || !options[k].trim())) return null;
+    const answer = String(item.answer || "").trim().toUpperCase();
+    if (!keys.includes(answer)) return null;
+    return { ...item, question: separated.question, options: Object.fromEntries(keys.map(k => [k, options[k].trim()])), answer };
   }
 
   function separateQuestionOptions(question, options) {
@@ -1480,7 +1975,7 @@ Spotlar:
 ${spots}`;
 
     try {
-      const text = await callWorker({ prompt, model: currentModel });
+      const text = await callWorker({ task: "quiz_generate", prompt });
       const data = parseBatch(text);
 
       if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") {
@@ -1490,12 +1985,11 @@ ${spots}`;
       const arr = Array.isArray(data) ? data : (Array.isArray(data.questions) ? data.questions : []);
       quizQueue = [];
       arr.forEach((item, idx) => {
-        const separated = separateQuestionOptions(item.question, item.options);
-        const opts = separated.options;
-        if (!separated.question || !opts || Object.keys(opts).length < 5) return;
+        const validated = validateGeneratedQuestion(item);
+        if (!validated) return;
         const src = picked[(Number(item.no) || idx + 1) - 1] || picked[idx];
         if (!src) return;
-        quizQueue.push({ src, data: { ...item, question: separated.question, options: opts } });
+        quizQueue.push({ src, data: validated });
       });
 
       if (!quizQueue.length) throw new Error("Yapay zeka soruları oluşturamadı, tekrar dene.");
@@ -1514,7 +2008,12 @@ ${spots}`;
     const btns = document.querySelectorAll("#quizOptions .opt");
     btns.forEach(b => b.disabled = true);
 
-    const correctKey = String(currentQuizData.answer || "A").trim().toUpperCase().charAt(0);
+    const correctKey = String(currentQuizData.answer || "").trim().toUpperCase();
+    if (!["A", "B", "C", "D", "E"].includes(correctKey)) {
+      btns.forEach(b => b.disabled = false);
+      alert("Bu sorunun cevap anahtarı geçersiz. Bu soru puanlanmadı; yeni soru getir.");
+      return;
+    }
     quizUserAnswer = selectedKey;
     const isCorrect = selectedKey === correctKey;
     clickedBtn.classList.add(isCorrect ? "right" : "wrong");
@@ -1589,7 +2088,7 @@ ${spots}`;
     const prompt = `Sen TUS hazırlık asistanısın. Aşağıdaki soru hakkında kullanıcının sorusunu yanıtla. Türkçe, anlaşılır ve öğretici ol.\n\n${context}\n\nKullanıcının sorusu: ${questionText}\n\nSADECE şu JSON formatında yanıt ver: {"answer":"Yanıtın"}`;
 
     try {
-      const raw = await callWorker({ prompt, model: currentModel });
+      const raw = await callWorker({ task: "quiz_followup", prompt });
       const parsed = parseBatch(raw);
       answerBox.textContent = typeof parsed.answer === "string" ? parsed.answer : "Yanıt okunamadı.";
     } catch (err) {
@@ -1603,3 +2102,259 @@ ${spots}`;
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+4

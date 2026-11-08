@@ -293,7 +293,8 @@
       <div class="card stack" id="geminiImportCard">
         <div>
           <h2 class="card-title">📥 Gemini sonucunu içe aktar</h2>
-          <div class="hint">Gemini'nin ürettiği JSON çıktısını buraya yapıştır. Birden fazla JSON nesnesini arka arkaya da yapıştırabilirsin. Bu işlem Claude API çağırmaz.</div>
+          <button class="link" type="button" onclick="copyGeminiPrompt()">Güncel Gemini prompt'unu kopyala</button>
+          <div class="hint">Önce prompt'u kopyalayıp işaretleme düzenini kendine göre doldur. Gemini'den 25–30 soruluk parçalar halinde JSON iste; her parçada aynı deneme adı ve tarihini kullan. JSON çıktılarını arka arkaya yapıştırabilirsin. Bu işlem Claude API çağırmaz.</div>
         </div>
         <textarea id="geminiJsonInput" rows="7" placeholder='Gemini JSON çıktısını buraya yapıştır...
 {"items":[{"questionNo":"42","branch":"Mikrobiyoloji","topic":"Bakteriyoloji","subTopic":"...","status":"wrong","keyTakeaway":"...","explanation":"...","confidence":"high"}]}'></textarea>
@@ -302,7 +303,7 @@
           <button class="link danger" onclick="clearGeminiImport()">Temizle</button>
         </div>
         <div id="geminiImportPreview" class="stack hidden">
-          <div id="geminiImportSummary" class="stat-grid"></div>
+          <div id="geminiImportSummary" class="stat-grid" style="grid-template-columns:repeat(5,1fr)"></div>
           <label class="hint" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="includeUncertainGemini" style="width:auto;">
             Orta ve düşük güvenli kayıtları da içe aktar
@@ -381,6 +382,31 @@
         <div>
           <h3 class="card-title">🎯 Son denemeye göre çalışma önceliği</h3>
           <div id="examRecommendations"></div>
+        </div>
+      </div>
+
+      <div id="examInsights" class="card stack hidden">
+        <div>
+          <h2 class="card-title">📊 Denemeler arası analiz</h2>
+          <div class="meta">Gemini JSON ile aktardığın yanlış/boş kayıtlardan hesaplanır. Dersler temel ve klinik olarak 11 başlıkta gruplanır.</div>
+        </div>
+        <div>
+          <h3 class="card-title">Tekrarlayan zayıf konular</h3>
+          <div id="insRecurring"></div>
+        </div>
+        <div>
+          <h3 class="card-title">Ders bazında yanlış + boş sayısı</h3>
+          <div class="meta">Fark negatifse hata sayısı azalmış demektir.</div>
+          <div id="insBranchTable" class="trend-table-wrap"></div>
+        </div>
+        <div>
+          <h3 class="card-title">Hata tipi dağılımı</h3>
+          <div id="insErrorTypes" class="trend-list"></div>
+        </div>
+        <div>
+          <h3 class="card-title">Soru sırasına göre hata</h3>
+          <div class="meta">Son dilimlerde artış yorgunluk veya süre baskısı sinyali olabilir.</div>
+          <div id="insPosition" class="trend-list"></div>
         </div>
       </div>
 
@@ -509,6 +535,89 @@
   const MAX_STREAK = 6;
   const INTERVAL_DAYS = [1, 3, 7, 14, 30];
   const DAY = 86400000;
+
+  // TUS ders yapısı: 6 temel + 5 klinik ders. Histoloji/Embriyoloji, Fizyoloji içinde tutulur.
+  const BRANCHES = {
+    temel: ["Anatomi", "Fizyoloji", "Biyokimya", "Mikrobiyoloji", "Patoloji", "Farmakoloji"],
+    klinik: ["Dahiliye", "Pediatri", "Genel Cerrahi", "Küçük Stajlar", "Kadın Doğum"]
+  };
+  const ALL_BRANCHES = [...BRANCHES.temel, ...BRANCHES.klinik];
+  const SMALL_STAJ_HINT = "Nöroloji, nöroşirürji/beyin cerrahisi, psikiyatri, dermatoloji, ortopedi, KBB, göz hastalıkları, üroloji, radyoloji, anestezi, plastik cerrahi, kalp damar cerrahisi, göğüs cerrahisi, fiziksel tıp ve rehabilitasyon, nükleer tıp, acil tıp, halk sağlığı ve adli tıp Küçük Stajlar sayılır. Çocuk cerrahisi ve enfeksiyon hastalıklarını kaynağın kendi ders sınıflamasına göre değerlendir; emin değilsen tahmin etme.";
+  const BRANCH_HINT = "Sadece şunlardan biri: " + ALL_BRANCHES.join(", ") + ". Histoloji ve Embriyoloji Fizyoloji sayılır. " + SMALL_STAJ_HINT;
+  const BRANCH_ALIASES = [
+    [/küçük\s*staj|kucuk\s*staj/, "Küçük Stajlar"],
+    [/histo|embriyo|fizyo/, "Fizyoloji"],
+    [/anatomi/, "Anatomi"],
+    [/biyokim/, "Biyokimya"],
+    [/mikro|bakteriyo|viroloji|parazit|immünoloji|immunoloji|mikoloji/, "Mikrobiyoloji"],
+    [/patol/, "Patoloji"],
+    [/farmak/, "Farmakoloji"],
+    [/kadın|kadin|doğum|dogum|jinekoloji|obstetrik/, "Kadın Doğum"],
+    [/çocuk\s*cerrahisi|cocuk\s*cerrahisi/, "Küçük Stajlar"],
+    [/pediatri|pediatrik|çocuk\s*hastalık|cocuk\s*hastalik/, "Pediatri"],
+    [/nöroloji|nöroşirürji|norosirurji|psikiyatri|dermatoloji|ortopedi|\bkbb\b|radyoloji|anestezi|halk\s*sağlığı|halk\s*sagligi|adli\s*tıp|adli\s*tip/, "Küçük Stajlar"],
+    [/üroloji|uroloji|\bgöz\b|goz hastalık|beyin\s*cerrahisi|plastik|kalp\s*damar|göğüs\s*cerrahisi|fiziksel\s*tıp|fizik\s*tedavi|nükleer|nukleer|acil\s*tıp|acil\s*tip/, "Küçük Stajlar"],
+    [/cerrahi/, "Genel Cerrahi"],
+    [/dahiliye|iç\s*hastalık|ic\s*hastalik/, "Dahiliye"]
+  ];
+  function normalizeBranch(name) {
+    const raw = String(name || "").trim();
+    const normalized = raw.toLocaleLowerCase("tr-TR");
+    for (const [pattern, target] of BRANCH_ALIASES) if (pattern.test(normalized)) return target;
+    return raw;
+  }
+  const branchGroup = branch => BRANCHES.temel.includes(branch) ? "temel" : "klinik";
+  const ERROR_TYPES = {
+    bilgi_eksigi: "Bilgi eksikliği",
+    dikkat_hatasi: "Dikkat hatası",
+    yanlis_hatirlama: "Yanlış hatırlama",
+    sure_baskisi: "Süre baskısı",
+    sansla_isaretleme: "Şansla işaretleme"
+  };
+  const slug = value => String(value || "").toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/g, "-").replace(/^-+|-+$/g, "");
+  function buildExamMeta(title, date, section) {
+    const examTitle = String(title || "").trim();
+    const examDate = date ? String(date).trim() : "";
+    return {
+      examTitle,
+      examDate,
+      examSection: section || "",
+      examKey: slug(examTitle)
+    };
+  }
+
+  const GEMINI_PROMPT = [
+    "Sen uzman bir TUS hocasısın. Ekteki deneme sınavı sayfalarını incele ve yalnızca yanlış, boş bırakılmış veya doğru olsa bile şansla işaretlenmiş soruları çıkar.",
+    "İŞARETLEME DÜZENİM: [BURAYA KENDİ İŞARETLEME DÜZENİNİ YAZ]",
+    "",
+    "KURALLAR:",
+    "- branch yalnızca şunlardan biri: " + ALL_BRANCHES.join(", ") + ".",
+    "- Histoloji ve Embriyoloji Fizyoloji sayılır. " + SMALL_STAJ_HINT,
+    "- status: wrong | empty | guess (doğru ama şansla işaretlendi). Doğru ve emin olunan soruları listeye ekleme.",
+    "- errorType: bilgi_eksigi | dikkat_hatasi | yanlis_hatirlama | sure_baskisi | sansla_isaretleme. Emin değilsen null yaz.",
+    "- myAnswer ve correctAnswer yalnızca A-E harflerinden biri veya null olmalı.",
+    "- difficulty: easy | medium | hard.",
+    "- keyTakeaway: genel spot değil, sorudaki AYIRT EDİCİ bilgiyi 1-2 cümlede yaz.",
+    "- explanation: doğru cevabın mekanizmasını ve temel çeldiricinin neden yanlış olduğunu en fazla 3-4 kısa cümlede açıkla.",
+    "- Okuyamadığın veya emin olmadığın kaydı confidence: low yap ve note alanına nedenini yaz. Tahmin etme.",
+    "- exam.date bilinmiyorsa null yaz. Her parçada aynı exam nesnesini kullan. Birden fazla parça gönderirsem sınav başlığı/tarihi/section bilgisi aynı kalmalı.",
+    "- Yalnızca yanlış, boş ve şansla işaretlenmiş kayıtları ekle; soru numaralarını aynen koru.",
+    "",
+    "SADECE geçerli JSON döndür:",
+    '{"exam":{"title":"5. Cilt 2. Deneme","date":null,"section":"temel|klinik"},"items":[{"questionNo":"42","branch":"Anatomi","topic":"Kaslar","subTopic":"Alt Ekstremite Kasları","status":"wrong","errorType":"bilgi_eksigi","myAnswer":"B","correctAnswer":"D","difficulty":"medium","keyTakeaway":"Ayırt edici TUS spotu.","explanation":"Doğru cevabın kısa gerekçesi.","confidence":"high","note":""}]}'
+  ].join("\n");
+
+  window.copyGeminiPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(GEMINI_PROMPT);
+      $("geminiImportStatus").textContent = "✓ Güncel Gemini prompt'u panoya kopyalandı. İşaretleme düzenini prompt içindeki ilgili satıra yaz.";
+    } catch (e) {
+      $("geminiJsonInput").value = GEMINI_PROMPT;
+      $("geminiJsonInput").focus();
+      $("geminiJsonInput").select();
+      $("geminiImportStatus").textContent = "Prompt kutuya aktarıldı. Tamamını kopyalayıp Gemini'ye yapıştırabilirsin.";
+    }
+  };
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -880,7 +989,7 @@
     valid.forEach(part => {
       (Array.isArray(part.topics) ? part.topics : []).forEach(t => {
         if (!t || !t.topic) return;
-        const branch = String(t.branch || "Genel").trim();
+        const branch = normalizeBranch(t.branch || "Genel");
         const topic = String(t.topic).trim();
         const key = `${branch}|${topic}`;
         const row = topicMap.get(key) || { branch, topic, questions: 0, correct: 0, wrong: 0, blank: 0, hasCounts: false };
@@ -915,7 +1024,7 @@
       // Eski formatta kaydedilen analizlerle geriye dönük uyum.
       valid.forEach(part => (Array.isArray(part.branches) ? part.branches : []).forEach(b => {
         if (!b || !b.branch) return;
-        const key = String(b.branch).trim();
+        const key = normalizeBranch(b.branch);
         const row = branchMap.get(key) || { branch: key, questions: 0, correct: 0, wrong: 0, blank: 0 };
         row.correct += finiteNumber(b.correct) || 0;
         row.wrong += finiteNumber(b.wrong) || 0;
@@ -942,8 +1051,8 @@
       });
     });
     if (!topics.length) legacyWeak.forEach(w => {
-      const key = `${String(w.branch || "Genel").trim()}|${String(w.subTopic).trim()}`;
-      const row = weakMap.get(key) || { branch: w.branch || "Genel", subTopic: w.subTopic, correct: 0, wrong: 0, blank: 0 };
+      const key = `${normalizeBranch(w.branch || "Genel")}|${String(w.subTopic).trim()}`;
+      const row = weakMap.get(key) || { branch: normalizeBranch(w.branch || "Genel"), subTopic: w.subTopic, correct: 0, wrong: 0, blank: 0 };
       row.correct += finiteNumber(w.correct) || 0;
       row.wrong += finiteNumber(w.wrong) || 0;
       row.blank += finiteNumber(w.blank) || 0;
@@ -1243,7 +1352,7 @@ SADECE aşağıdaki geçerli JSON formatında yanıt ver:
   "items": [
     {
       "questionNo": "Soru No (Örn: 64)",
-      "branch": "Branş Adı (Sadece: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+      "branch": "Branş Adı (${BRANCH_HINT})",
       "topic": "Konu Başlığı",
       "subTopic": "Alt Konu",
       "keyTakeaway": "1-2 cümlelik net, vurucu TUS spotu",
@@ -1268,10 +1377,15 @@ Kullanıcı Notu: ${note}
           const batchItems = Array.isArray(rawParsed) ? rawParsed : (Array.isArray(rawParsed?.items) ? rawParsed.items : (rawParsed?.branch ? [rawParsed] : []));
           allItems.push(...batchItems);
         }
-        const items = allItems;
+        const items = allItems.map(i => ({ status: "wrong", ...i }));
         if (!items.length) throw new Error("Yüklenen sayfalarda (-) işaretli veya hatalı soru tespit edilemedi. Soru numaralarını not kutusuna yazıp tekrar deneyebilirsin.");
 
-        const savedItems = await saveExtractedItemsList(items, "exam", note || "Deneme Kitapçığı");
+        const bookletDate = new Date().toISOString().slice(0, 10);
+        const bookletTitle = note || `Deneme Kitapçığı ${bookletDate}`;
+        const savedItems = await saveExtractedItemsList(
+          items, "exam", bookletTitle,
+          buildExamMeta(bookletTitle, bookletDate, "")
+        );
         const resCard = $("examResultCard");
         resCard.innerHTML = `
           <div style="font-weight:650; color:var(--accent); font-size:15px;">
@@ -1344,7 +1458,7 @@ Kullanıcı Notu: ${note}
       return `<div class="trend-row"><span title="${esc(ex.examTitle || "Deneme")}">${esc((ex.examTitle || "Deneme").slice(0, 18))}</span><div class="trend-track"><div class="trend-fill" style="width:${width}%"></div></div><b>${n.toFixed(2)}</b></div>`;
     }).join("");
 
-    const branchOrder = ["Anatomi", "Fizyoloji", "Biyokimya", "Mikrobiyoloji", "Patoloji", "Farmakoloji", "Dahiliye", "Pediatri", "Genel Cerrahi", "Kadın Doğum", "Küçük Stajlar"];
+    const branchOrder = ALL_BRANCHES;
     const names = new Set();
     recent.forEach(ex => (ex.branches || []).forEach(b => { if (b.branch) names.add(b.branch); }));
     const orderedNames = [...names].sort((a, b) => {
@@ -1487,40 +1601,64 @@ Kullanıcı Notu: ${note}
     });
   }
 
-  async function saveExtractedItemsList(items, sourceType, rawTextLabel) {
+  const statusText = status => status === "empty" ? "Boş bırakılmış soru"
+    : status === "wrong" ? "Yanlış cevaplanan soru"
+    : status === "guess" ? "Doğru ama şansla işaretlenen soru" : "";
+
+  async function saveExtractedItemsList(items, sourceType, rawTextLabel, examMeta) {
     let savedCount = 0;
     const htmlList = [];
 
     for (let i = 0; i < items.length; i++) {
-      const parsed = items[i];
+      const parsed = { ...items[i] };
+      parsed.branch = normalizeBranch(parsed.branch);
+      if (examMeta && !parsed.examKey) Object.assign(parsed, examMeta);
       let itemSaved = false;
 
-      if (parsed.branch !== "SİSTEM MESAJI" && parsed.branch !== "API HATASI" && parsed.branch !== "Kota Doldu") {
-        const dup = findDuplicate(parsed);
+      if (!["SİSTEM MESAJI", "API HATASI", "Kota Doldu"].includes(parsed.branch)) {
+        const questionNo = parsed.questionNo ? String(parsed.questionNo) : "";
         let doSave = true;
 
-        if (dup) {
-          if (items.length === 1) {
-            doSave = confirm(`Benzer bir spot zaten arşivinde var:\n\n"${dup.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`);
-          } else {
-            doSave = false;
+        if (parsed.examKey && questionNo) {
+          // Aynı denemenin aynı soru numarası yeniden içe aktarılırsa ikinci kayıt oluşturma.
+          doSave = !allQuestions.some(q => q.examKey === parsed.examKey && String(q.questionNo || "") === questionNo);
+        } else {
+          const duplicate = findDuplicate(parsed);
+          if (duplicate) {
+            doSave = items.length === 1
+              ? confirm(`Benzer bir spot zaten arşivinde var:\n\n"${duplicate.keyTakeaway}"\n\nYine de yeni kayıt olarak eklensin mi?`)
+              : false;
           }
         }
 
         if (doSave) {
+          const rawSubTopic = parsed.subTopic || "";
           const newDoc = {
             branch: parsed.branch || "Genel",
             topic: parsed.topic || "Genel",
-            subTopic: (parsed.questionNo ? `[Soru ${parsed.questionNo}] ` : "") + (parsed.subTopic || ""),
-            sourceType: sourceType || "question", // 'question' | 'spot' | 'exam'
-            rawQuestion: rawTextLabel ? rawTextLabel.substring(0, 500) : "TUS Sorusu",
+            subTopic: (questionNo ? `[Soru ${questionNo}] ` : "") + rawSubTopic,
+            subTopicRaw: rawSubTopic,
+            sourceType: sourceType || "question",
+            rawQuestion: rawTextLabel ? String(rawTextLabel).substring(0, 500) : "TUS Sorusu",
             aiExplanation: parsed.explanation || "",
             keyTakeaway: parsed.keyTakeaway || "",
-            questionNo: parsed.questionNo ? String(parsed.questionNo) : "",
-            examStatus: parsed.status === "empty" ? "empty" : (parsed.status === "wrong" ? "wrong" : ""),
+            questionNo,
+            examStatus: ["wrong", "empty", "guess"].includes(parsed.status) ? parsed.status : "",
             confidence: parsed.confidence || "high",
             importSource: parsed.importSource || "",
-            box: 0, nextReview: Date.now(), learned: false, deleted: false,
+            examKey: parsed.examKey || "",
+            examTitle: parsed.examTitle || "",
+            examDate: parsed.examDate || "",
+            examSection: parsed.examSection || "",
+            errorType: parsed.errorType || "",
+            myAnswer: parsed.myAnswer || "",
+            correctAnswer: parsed.correctAnswer || "",
+            difficulty: parsed.difficulty || "",
+            note: parsed.note || "",
+            box: 0,
+            nextReview: Date.now(),
+            learned: false,
+            deleted: false,
             createdAtMs: Date.now() + i
           };
 
@@ -1536,14 +1674,16 @@ Kullanıcı Notu: ${note}
               body: JSON.stringify({
                 action: "save_web_question",
                 data: {
-                  branch: parsed.branch || "Genel",
-                  keyTakeaway: parsed.keyTakeaway || "",
-                  aiExplanation: parsed.explanation || ""
+                  branch: newDoc.branch,
+                  keyTakeaway: newDoc.keyTakeaway,
+                  aiExplanation: newDoc.aiExplanation
                 }
               })
             });
-            if (items.length > 1) await new Promise(r => setTimeout(r, 350));
-          } catch (e) { console.log("Telegram bota giderken hata:", e); }
+            if (items.length > 1) await new Promise(resolve => setTimeout(resolve, 350));
+          } catch (error) {
+            console.log("Telegram bota giderken hata:", error);
+          }
         }
       }
 
@@ -1556,12 +1696,13 @@ Kullanıcı Notu: ${note}
             </div>
             <span class="meta" style="color:${itemSaved ? 'var(--ok)' : 'var(--muted)'}">${itemSaved ? "✓ Kaydedildi" : "Atlandı (Mevcut)"}</span>
           </div>
-          <div class="meta">${parsed.status === "empty" ? "Boş bırakılmış soru" : (parsed.status === "wrong" ? "Yanlış cevaplanmış soru" : "")}${parsed.confidence ? ` · Güven: ${esc(parsed.confidence)}` : ""}</div>
+          <div class="meta">${esc(statusText(parsed.status))}${parsed.errorType && ERROR_TYPES[parsed.errorType] ? ` · ${esc(ERROR_TYPES[parsed.errorType])}` : ""}${parsed.confidence ? ` · Güven: ${esc(parsed.confidence)}` : ""}</div>
           <div class="spot">${fmt(parsed.keyTakeaway || "")}</div>
           <div>
             <div class="label">Çözüm ve patofizyoloji</div>
             <div class="reading pre">${fmt(parsed.explanation || "")}</div>
           </div>
+          ${parsed.note ? `<div class="meta">Not: ${esc(parsed.note)}</div>` : ""}
         </div>
       `);
     }
@@ -1604,7 +1745,7 @@ Sen uzman bir TUS hocasısın. Gönderilen görseli veya metni incele ve içinde
 {
   "items": [
     {
-      "branch": "Branş Adı (Sadece: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+      "branch": "Branş Adı (${BRANCH_HINT})",
       "topic": "Konu Başlığı",
       "subTopic": "Alt Konu",
       "keyTakeaway": "1-2 cümlelik net TUS spotu",
@@ -1621,7 +1762,7 @@ Sen uzman bir TUS hocasısın. Aşağıdaki ders notunu/metni analiz et ve için
 {
   "items": [
     {
-      "branch": "Branş Adı (Sadece: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+      "branch": "Branş Adı (${BRANCH_HINT})",
       "topic": "Konu Başlığı",
       "subTopic": "Alt Konu",
       "keyTakeaway": "1-2 cümlelik net, vurucu SPOT bilgi",
@@ -1634,7 +1775,7 @@ Metin: ${chunkText}
 Sen uzman bir TUS hocasısın. Görevin aşağıda fotoğrafı veya metni verilen TUS sorusunu/notunu analiz etmek.
 Cevabı KESİNLİKLE sadece aşağıdaki geçerli JSON formatında ver:
 {
-  "branch": "Branş Adı (Sadece şunlardan biri: Dahiliye, Pediatri, Genel Cerrahi, Kadın Doğum, Küçük Stajlar, Anatomi, Fizyoloji, Biyokimya, Mikrobiyoloji, Patoloji, Farmakoloji)",
+  "branch": "Branş Adı (${BRANCH_HINT})",
   "topic": "Konu Başlığı",
   "subTopic": "Alt Konu",
   "keyTakeaway": "TUS'ta soru yaptıracak 1-2 cümlelik çok net, vurucu SPOT bilgi",
@@ -1747,29 +1888,48 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     if (!value || typeof value !== "object") return out;
     if (Array.isArray(value.items)) {
       value.items.forEach(v => unpackGeminiItems(v, out));
-    } else if (value.questionNo !== undefined || value.question_no !== undefined) {
+    } else if (value.questionNo !== undefined || value.question_no !== undefined || value.no !== undefined) {
       out.push(value);
     }
     return out;
   }
 
-  function normalizeGeminiImportItem(item, index) {
-    const statusRaw = String(item.status || item.result || "").trim().toLowerCase();
+  function normalizeGeminiImportItem(item, index, examContext) {
+    const statusRaw = String(item.status || item.result || "").trim().toLocaleLowerCase("tr-TR");
     const statusMap = {
       wrong: "wrong", incorrect: "wrong", yanlis: "wrong", "yanlış": "wrong", y: "wrong",
-      empty: "empty", blank: "empty", bos: "empty", "boş": "empty", b: "empty"
+      empty: "empty", blank: "empty", bos: "empty", "boş": "empty", b: "empty",
+      guess: "guess", sansla: "guess", "şansla": "guess"
     };
     const status = statusMap[statusRaw];
-    if (!status) throw new Error(`${index + 1}. kayıtta status alanı wrong veya empty olmalı.`);
+    if (!status) throw new Error(`${index + 1}. kayıtta status alanı wrong, empty veya guess olmalı.`);
 
-    const branch = String(item.branch || item.ders || "").trim();
+    const rawBranch = String(item.branch || item.ders || "").trim();
+    if (!rawBranch) throw new Error(`${index + 1}. kayıtta branch/ders alanı eksik.`);
+    const branch = normalizeBranch(rawBranch);
+    if (!ALL_BRANCHES.includes(branch)) throw new Error(`${index + 1}. kayıtta ders tanınmadı: ${rawBranch}. İzin verilen dersler: ${ALL_BRANCHES.join(", ")}.`);
+
     const keyTakeaway = String(item.keyTakeaway || item.key_takeaway || item.spot || "").trim();
     const questionNo = String(item.questionNo ?? item.question_no ?? item.no ?? "").trim();
-    if (!branch) throw new Error(`${index + 1}. kayıtta branch/ders alanı eksik.`);
     if (!keyTakeaway) throw new Error(`${index + 1}. kayıtta keyTakeaway/spot alanı eksik.`);
 
     let confidence = String(item.confidence || "medium").trim().toLowerCase();
     if (!["high", "medium", "low"].includes(confidence)) confidence = "medium";
+
+    const exam = item.exam || examContext || {};
+    const examTitle = exam.title || item.examTitle || item.exam_title || "";
+    const examDate = exam.date ?? item.examDate ?? item.exam_date ?? null;
+    const examSection = exam.section || item.examSection || item.exam_section || "";
+    const examMeta = examTitle ? buildExamMeta(examTitle, examDate, examSection) : {};
+    const answerLetter = value => {
+      const letter = String(value ?? "").trim().toUpperCase();
+      return /^[A-E]$/.test(letter) ? letter : null;
+    };
+    const errorType = Object.prototype.hasOwnProperty.call(ERROR_TYPES, item.errorType) ? item.errorType
+      : (status === "guess" ? "sansla_isaretleme" : "");
+    const difficulty = ["easy", "medium", "hard"].includes(String(item.difficulty || "").toLowerCase())
+      ? String(item.difficulty).toLowerCase() : "";
+
     return {
       questionNo,
       branch,
@@ -1779,59 +1939,81 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       keyTakeaway,
       explanation: String(item.explanation || item.aiExplanation || "").trim(),
       confidence,
-      importSource: "Gemini JSON"
+      importSource: "Gemini JSON",
+      errorType,
+      difficulty,
+      myAnswer: answerLetter(item.myAnswer),
+      correctAnswer: answerLetter(item.correctAnswer),
+      note: String(item.note || "").trim(),
+      ...examMeta
     };
   }
 
   window.checkGeminiImport = () => {
-    const status = $("geminiImportStatus");
-    const btn = $("checkGeminiImportBtn");
-    btn.disabled = true;
-    status.textContent = "JSON kontrol ediliyor…";
+    const statusEl = $("geminiImportStatus");
+    const button = $("checkGeminiImportBtn");
+    button.disabled = true;
+    statusEl.textContent = "JSON kontrol ediliyor…";
     try {
-      const docs = splitTopLevelJsonDocuments($("geminiJsonInput").value);
-      const rawItems = docs.flatMap(doc => unpackGeminiItems(doc, []));
+      const documents = splitTopLevelJsonDocuments($("geminiJsonInput").value);
+      const rawItems = documents.flatMap(document => {
+        const exam = document && !Array.isArray(document) && document.exam ? document.exam : null;
+        return unpackGeminiItems(document, []).map(item => ({ item, exam }));
+      });
       if (!rawItems.length) throw new Error('JSON içinde "items" dizisi veya soru kaydı bulunamadı.');
 
-      const normalized = rawItems.map((item, i) => normalizeGeminiImportItem(item, i));
+      const normalized = rawItems.map(({ item, exam }, index) => normalizeGeminiImportItem(item, index, exam));
       const seen = new Set();
       const unique = [];
       let duplicateCount = 0;
       normalized.forEach(item => {
-        const key = item.questionNo ? `${item.branch.toLocaleLowerCase("tr-TR")}|${item.questionNo}` : `${item.branch}|${item.subTopic}|${item.keyTakeaway}`;
+        const key = item.examKey && item.questionNo
+          ? `${item.examKey}|${item.questionNo}`
+          : `${item.branch}|${item.subTopic}|${item.keyTakeaway}`;
         if (seen.has(key)) { duplicateCount++; return; }
-        seen.add(key); unique.push(item);
+        seen.add(key);
+        unique.push(item);
       });
       pendingGeminiItems = unique;
 
-      const wrong = unique.filter(x => x.status === "wrong").length;
-      const empty = unique.filter(x => x.status === "empty").length;
-      const high = unique.filter(x => x.confidence === "high").length;
+      const wrong = unique.filter(item => item.status === "wrong").length;
+      const empty = unique.filter(item => item.status === "empty").length;
+      const guess = unique.filter(item => item.status === "guess").length;
+      const high = unique.filter(item => item.confidence === "high").length;
       const uncertain = unique.length - high;
+      const already = unique.filter(item => item.examKey && item.questionNo && allQuestions.some(q => q.examKey === item.examKey && String(q.questionNo || "") === item.questionNo)).length;
+      const noExam = unique.filter(item => !item.examKey).length;
+
       $("geminiImportSummary").innerHTML = `
         <div class="stat-box"><span class="val">${unique.length}</span><span class="lbl">Toplam kayıt</span></div>
         <div class="stat-box"><span class="val" style="color:var(--bad)">${wrong}</span><span class="lbl">Yanlış</span></div>
         <div class="stat-box"><span class="val">${empty}</span><span class="lbl">Boş</span></div>
+        <div class="stat-box"><span class="val">${guess}</span><span class="lbl">Şansla doğru</span></div>
         <div class="stat-box"><span class="val" style="color:var(--ok)">${high}</span><span class="lbl">Yüksek güven</span></div>
       `;
-      $("geminiImportConfidenceNote").textContent = `${uncertain} orta/düşük güvenli kayıt varsayılan olarak aktarılmayacak.${duplicateCount ? ` ${duplicateCount} yinelenen kayıt önizlemeden çıkarıldı.` : ""} Kontrol ettikten sonra istersen bunları da dahil edebilirsin.`;
+      $("geminiImportConfidenceNote").textContent =
+        `${uncertain} orta/düşük güvenli kayıt varsayılan olarak aktarılmayacak.` +
+        (duplicateCount ? ` ${duplicateCount} yinelenen kayıt çıkarıldı.` : "") +
+        (already ? ` ${already} kayıt bu denemeden zaten arşivde, atlanacak.` : "") +
+        (noExam ? ` ⚠ ${noExam} kayıtta exam bilgisi yok; denemeler arası analize dahil olmayacak.` : "");
       $("geminiImportListTitle").textContent = `Önizleme (${unique.length} kayıt)`;
       $("geminiImportList").innerHTML = unique.slice(0, 25).map(item => `
         <div class="card stack" style="padding:10px;gap:6px;">
-          <div class="result-head"><b>${esc(item.questionNo ? `Soru ${item.questionNo}` : item.subTopic)}</b><span class="meta">${item.status === "empty" ? "Boş" : "Yanlış"} · ${esc(item.confidence)}</span></div>
-          <div class="meta">${esc(item.branch)} · ${esc(item.topic)}</div>
+          <div class="result-head"><b>${esc(item.questionNo ? `Soru ${item.questionNo}` : item.subTopic)}</b><span class="meta">${esc(statusText(item.status))} · ${esc(item.confidence)}</span></div>
+          <div class="meta">${esc(item.branch)} · ${esc(item.topic)}${item.examTitle ? ` · ${esc(item.examTitle)}` : ""}</div>
           <div class="spot">${fmt(item.keyTakeaway)}</div>
+          ${item.note ? `<div class="meta">Not: ${esc(item.note)}</div>` : ""}
         </div>
       `).join("") + (unique.length > 25 ? `<div class="meta">İlk 25 kayıt gösteriliyor; toplam ${unique.length} kayıt kontrol edildi.</div>` : "");
       $("saveGeminiImportBtn").textContent = "Seçilen kayıtları arşive aktar";
       $("geminiImportPreview").classList.remove("hidden");
-      status.textContent = `✓ ${docs.length} JSON bloğu okundu. Kayıtları kontrol edebilirsin.`;
-    } catch (err) {
+      statusEl.textContent = `✓ ${documents.length} JSON bloğu okundu. Kayıtları kontrol edebilirsin.`;
+    } catch (error) {
       pendingGeminiItems = [];
       $("geminiImportPreview").classList.add("hidden");
-      status.textContent = "JSON kontrol hatası: " + err.message;
+      statusEl.textContent = "JSON kontrol hatası: " + error.message;
     } finally {
-      btn.disabled = false;
+      button.disabled = false;
     }
   };
 
@@ -1880,6 +2062,91 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     $("includeUncertainGemini").checked = false;
   };
 
+  function renderExamInsights() {
+    const card = $("examInsights");
+    if (!card) return;
+    const examQuestions = allQuestions.filter(question => question.sourceType === "exam" && question.examKey);
+    if (!examQuestions.length) { card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+
+    const examMap = new Map();
+    examQuestions.forEach(question => {
+      const current = examMap.get(question.examKey) || {
+        key: question.examKey,
+        title: question.examTitle || question.examKey,
+        time: question.createdAtMs || 0
+      };
+      const created = question.createdAtMs || current.time;
+      current.time = current.time ? Math.min(current.time, created) : created;
+      examMap.set(question.examKey, current);
+    });
+    const examList = [...examMap.values()].sort((a, b) => a.time - b.time);
+    const missed = examQuestions.filter(question => question.examStatus === "wrong" || question.examStatus === "empty");
+
+    // 1) En az iki farklı denemede tekrarlayan zayıf alt konular.
+    const groups = new Map();
+    missed.forEach(question => {
+      const rawSubTopic = String(question.subTopicRaw ?? String(question.subTopic || "").replace(/^\[Soru [^\]]*\]\s*/, "")).trim();
+      const key = [question.branch, question.topic, rawSubTopic].join("|");
+      const group = groups.get(key) || { branch: question.branch, subTopic: rawSubTopic, exams: new Set(), count: 0 };
+      group.exams.add(question.examKey);
+      group.count++;
+      groups.set(key, group);
+    });
+    const recurring = [...groups.values()].filter(group => group.exams.size >= 2)
+      .sort((a, b) => b.exams.size - a.exams.size || b.count - a.count).slice(0, 10);
+    $("insRecurring").innerHTML = recurring.length
+      ? recurring.map(group => `<div class="weak-item"><span><b>${esc(group.branch)}</b> — ${esc(group.subTopic)}</span><span>${group.exams.size} deneme · ${group.count} hata</span></div>`).join("")
+      : `<div class="meta">Henüz birden fazla denemede tekrar eden alt konu yok.${examList.length < 2 ? " Karşılaştırma için en az iki deneme aktar." : ""}</div>`;
+
+    // 2) Son beş denemede ders başına yanlış + boş kayıt sayısı.
+    const recent = examList.slice(-5);
+    const counts = new Map();
+    missed.forEach(question => {
+      const perExam = counts.get(question.branch) || new Map();
+      perExam.set(question.examKey, (perExam.get(question.examKey) || 0) + 1);
+      counts.set(question.branch, perExam);
+    });
+    const rows = ALL_BRANCHES.filter(branch => counts.has(branch)).map(branch => {
+      const perExam = counts.get(branch);
+      const values = recent.map(exam => perExam.get(exam.key) || 0);
+      const last = values.length ? values[values.length - 1] : 0;
+      const previous = values.length > 1 ? values[values.length - 2] : null;
+      const diff = previous === null ? null : last - previous;
+      const className = diff === null || diff === 0 ? "trend-flat" : diff < 0 ? "trend-up" : "trend-down";
+      const label = diff === null ? "—" : `${diff > 0 ? "+" : ""}${diff}`;
+      return `<tr><td><b>${esc(branch)}</b> <span class="meta">${branchGroup(branch) === "temel" ? "Temel" : "Klinik"}</span></td><td>${last}</td><td class="${className}">${label}</td><td><div class="trend-chips">${values.map(value => `<span class="trend-chip">${value}</span>`).join("")}</div></td></tr>`;
+    }).join("");
+    $("insBranchTable").innerHTML = rows
+      ? `<table class="trend-table"><thead><tr><th>Ders</th><th>Son</th><th>Fark</th><th>Son ${recent.length} deneme</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="meta">Ders bazında yanlış/boş verisi henüz yok.</div>`;
+
+    // 3) Hata tipi dağılımı.
+    const typed = missed.filter(question => ERROR_TYPES[question.errorType]);
+    const typeCounts = {};
+    typed.forEach(question => { typeCounts[question.errorType] = (typeCounts[question.errorType] || 0) + 1; });
+    const maxTypeCount = Math.max(1, ...Object.values(typeCounts));
+    $("insErrorTypes").innerHTML = typed.length
+      ? Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([key, count]) =>
+        `<div class="trend-row"><span>${esc(ERROR_TYPES[key])}</span><div class="trend-track"><div class="trend-fill" style="width:${count / maxTypeCount * 100}%"></div></div><b>${count}</b></div>`
+      ).join("") + `<div class="meta">${missed.length - typed.length} kayıtta hata tipi belirtilmemiş.</div>`
+      : `<div class="meta">Hata tipi içeren kayıt yok. Güncel Gemini prompt'unu kullan.</div>`;
+
+    // 4) Soru sırasına göre hata yoğunluğu (10'luk dilimler).
+    const bins = {};
+    missed.forEach(question => {
+      const number = parseInt(question.questionNo, 10);
+      if (!Number.isFinite(number) || number < 1) return;
+      const bin = Math.floor((number - 1) / 10);
+      bins[bin] = (bins[bin] || 0) + 1;
+    });
+    const binKeys = Object.keys(bins).map(Number).sort((a, b) => a - b);
+    const maxBinCount = Math.max(1, ...Object.values(bins));
+    $("insPosition").innerHTML = binKeys.length
+      ? binKeys.map(bin => `<div class="trend-row"><span>${bin * 10 + 1}–${bin * 10 + 10}</span><div class="trend-track"><div class="trend-fill" style="width:${bins[bin] / maxBinCount * 100}%"></div></div><b>${bins[bin]}</b></div>`).join("")
+      : `<div class="meta">Soru numarası olan yanlış/boş kayıt yok.</div>`;
+  }
+
   // ===================== ARŞİV VE FİLTRELER =====================
 
   window.loadUserQuestions = async () => {
@@ -1891,7 +2158,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
         if (data.deleted === true) return;
         if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") return;
         items.push({
-          id: d.id, ...data,
+          id: d.id, ...data, branch: normalizeBranch(data.branch),
           sourceType: data.sourceType || "question",
           box: typeof data.box === "number" ? data.box : 0,
           nextReview: typeof data.nextReview === "number" ? data.nextReview : 0,
@@ -1914,7 +2181,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     $("dueCount").textContent = due;
     $("dueBadge").textContent = due;
     $("dueBadge").classList.toggle("hidden", due === 0);
-    renderFilters(); renderQuestions();
+    renderFilters(); renderQuestions(); renderExamInsights();
   }
 
   window.setStatus = (s) => {
@@ -1958,7 +2225,8 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
   function renderFilters() {
     const list = inStatus();
-    const branches = ["All", ...new Set(list.map(q => q.branch).filter(Boolean))];
+    const present = new Set(list.map(q => q.branch).filter(Boolean));
+    const branches = ["All", ...ALL_BRANCHES.filter(branch => present.has(branch)), ...[...present].filter(branch => !ALL_BRANCHES.includes(branch))];
     if (selectedBranchFilter !== "All" && !branches.includes(selectedBranchFilter)) selectedBranchFilter = "All";
     $("branchFilters").innerHTML = branches.map(b =>
       `<button class="chip ${selectedBranchFilter === b ? "on" : ""}" data-b="${esc(b)}" onclick="setFilter(this.dataset.b)">${b === "All" ? "Tüm Dersler (" + list.length + ")" : esc(b)}</button>`).join("");
@@ -1972,9 +2240,12 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     return Math.ceil(diff / DAY) + " gün sonra tekrar";
   }
 
-  function badgeForType(t, examStatus) {
-    if (t === "exam") return `<span class="type-badge exam">🔥 Deneme${examStatus === "empty" ? " · Boş" : examStatus === "wrong" ? " · Yanlış" : ""}</span>`;
-    if (t === "spot") return `<span class="type-badge spot">📌 Spot</span>`;
+  function badgeForType(type, examStatus) {
+    const status = examStatus === "empty" ? " · Boş"
+      : examStatus === "wrong" ? " · Yanlış"
+      : examStatus === "guess" ? " · Şansla" : "";
+    if (type === "exam") return `<span class="type-badge exam">🔥 Deneme${status}</span>`;
+    if (type === "spot") return `<span class="type-badge spot">📌 Spot</span>`;
     return `<span class="type-badge question">❓ Soru</span>`;
   }
 

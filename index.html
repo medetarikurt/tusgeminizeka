@@ -185,6 +185,10 @@
 
     .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
+    #quizModeHint { text-align: center; margin-top: -5px; }
+    #quizContainer.quiz-fast .quiz-q { font-family: inherit; font-size: 19px; font-weight: 650; line-height: 1.45; }
+    #quizContainer.quiz-fast .opt { padding: 10px 12px; min-height: 42px; }
+    #quizContainer.quiz-fast #quizAskBox { display: none; }
     .opt {
       display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
       background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; min-height: 48px;
@@ -451,6 +455,11 @@
           <button class="on" onclick="setQuizSource('ALL')">Tüm Havuz</button>
           <button onclick="setQuizSource('exam')">🔥 Deneme Yanlışları</button>
         </div>
+        <div class="seg" id="quizModeSeg" role="group" aria-label="Test modu">
+          <button id="quizModeRapid" class="on" onclick="setQuizMode('rapid')">⚡ Hızlı Spot</button>
+          <button id="quizModeClinical" onclick="setQuizMode('clinical')">Klinik Vaka</button>
+        </div>
+        <div id="quizModeHint" class="meta">Kısa, doğrudan bilgi soruları. Uzun klinik vaka yok.</div>
         <div class="seg" id="countSeg" role="group" aria-label="Soru sayısı">
           <button data-n="1" onclick="setQuizCount(1)">1 soru</button>
           <button data-n="3" onclick="setQuizCount(3)">3 soru</button>
@@ -641,6 +650,7 @@
   let quizQueue = [], quizIndex = 0;
   let quizCount = parseInt(localStorage.getItem("tus_quiz_count") || "5", 10);
   if (![1, 3, 5, 10].includes(quizCount)) quizCount = 5;
+  let quizMode = localStorage.getItem("tus_quiz_mode") === "clinical" ? "clinical" : "rapid";
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2287,6 +2297,17 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     btns[1].classList.toggle("on", src === "exam");
   };
 
+  window.setQuizMode = (mode) => {
+    quizMode = mode === "clinical" ? "clinical" : "rapid";
+    localStorage.setItem("tus_quiz_mode", quizMode);
+    $("quizModeRapid").classList.toggle("on", quizMode === "rapid");
+    $("quizModeClinical").classList.toggle("on", quizMode === "clinical");
+    $("quizModeHint").textContent = quizMode === "rapid"
+      ? "Kısa, doğrudan bilgi soruları. Uzun klinik vaka yok."
+      : "Orta-zor klinik vakalar ve güçlü çeldiriciler.";
+    $("newQuizBtn").textContent = quizMode === "rapid" ? "Hızlı teste başla" : "Klinik soru getir";
+  };
+
   window.setQuizCount = (n) => {
     quizCount = n;
     localStorage.setItem("tus_quiz_count", String(n));
@@ -2370,6 +2391,8 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     const { src, data } = quizQueue[quizIndex];
     activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
     currentQuizData = data;
+    $("quizContainer").classList.toggle("quiz-fast", quizMode === "rapid");
+    $("quizAskBox").classList.toggle("hidden", quizMode === "rapid");
     quizUserAnswer = null;
     $("quizAskInput").value = "";
     $("personalNoteInput").value = activeQuizQuestion.personalNote || "";
@@ -2386,7 +2409,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     data.options = separated.options;
 
     $("quizResult").classList.add("hidden");
-    $("quizSubBadge").textContent = [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
+    $("quizSubBadge").textContent = `${quizMode === "rapid" ? "⚡ Hızlı Spot" : "Klinik Vaka"} · ` + [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
     $("quizStreakBadge").textContent = `Seviye ${activeQuizQuestion.box}/${MAX_STREAK}`;
     $("quizQuestion").textContent = data.question;
     $("nextQuizBtn").textContent = quizIndex + 1 < quizQueue.length ? "Sıradaki soru" : "Yeni set getir";
@@ -2471,7 +2494,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
     // Uzun 10 soruluk tek yanıt max_tokens sınırına çarpabiliyor.
     // Spotları ikişerli gruplar halinde üretip sırayla birleştir.
-    const batchSize = 2;
+    const batchSize = quizMode === "rapid" ? 5 : 2;
     const batches = [];
     for (let i = 0; i < picked.length; i += batchSize) {
       batches.push(picked.slice(i, i + batchSize));
@@ -2488,7 +2511,38 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
           `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`
         ).join("\n");
 
-        const prompt = `Aşağıdaki ${batch.length} TUS spot bilgisinin HER BİRİ için ayrı, gerçek TUS zorluğunda klinik vaka sorusu hazırla.
+        const prompt = quizMode === "rapid" ? `
+Aşağıdaki TUS spotlarını HIZLI TEKRAR TESTİNE dönüştür.
+
+AMAÇ: Öğrenci uzun klinik vaka okumadan, spot bilgisini hatırlayıp birkaç saniyede cevap verebilsin.
+KURALLAR:
+- Her spot için tam 1 kısa, doğrudan bilgi sorusu üret.
+- Klinik senaryo, hasta öyküsü, laboratuvar paneli veya uzun vaka KULLANMA.
+- Soru kökü tercihen tek cümle ve en fazla 15-20 kelime olsun.
+- Beş seçenek kısa olsun; tercihen tek terim, ilaç, mekanizma veya tanı.
+- Çeldiriciler aynı bilgi alanından ve makul olsun; yalnızca 1 doğru cevap olsun.
+- Spotta olmayan ayrıntı uydurma. Bilgi soru üretmeye uygun değilse en yakın temel bilgiyi ölç.
+- Açıklama en fazla 1 kısa cümle olsun.
+- Her spot için bir soru üret ve sırayı koru. no alanını 1'den başlat.
+- Sadece geçerli JSON döndür; markdown veya ek açıklama yazma.
+
+JSON:
+{
+  "questions": [
+    {
+      "no": 1,
+      "question": "Kısa ve doğrudan TUS bilgi sorusu?",
+      "options": { "A": "Kısa seçenek", "B": "Kısa seçenek", "C": "Kısa seçenek", "D": "Kısa seçenek", "E": "Kısa seçenek" },
+      "answer": "A",
+      "explanation": "Doğru bilginin tek cümlelik açıklaması."
+    }
+  ]
+}
+
+Spotlar:
+${spots}
+` : `
+Aşağıdaki TUS spotlarının HER BİRİ için ayrı, gerçek TUS zorluğunda klinik vaka sorusu hazırla.
 
 KURALLAR:
 - Her spot için tam bir soru üret ve spotların sırasını koru.
@@ -2513,7 +2567,9 @@ SADECE aşağıdaki yapıda geçerli JSON döndür:
 }
 
 Spotlar:
-${spots}`;
+${spots}
+
+Yalnızca JSON döndür.`
 
         const text = await callWorker({ task: "quiz_generate", prompt });
         const data = parseBatch(text);
@@ -2643,6 +2699,7 @@ ${spots}`;
   };
 
   setQuizCount(quizCount);
+  setQuizMode(quizMode);
   renderAiUsage();
 </script>
 </body>

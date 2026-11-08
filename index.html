@@ -2467,17 +2467,37 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     $("quizSubBadge").textContent = "";
     $("quizStreakBadge").textContent = "";
 
-    const spots = picked.map((q, i) => `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`).join("\n");
+    quizQueue = [];
 
-    const prompt = `Aşağıdaki ${picked.length} TUS spot bilgisinin HER BİRİ için ayrı, gerçek TUS zorluğunda klinik vaka sorusu hazırla.
+    // Uzun 10 soruluk tek yanıt max_tokens sınırına çarpabiliyor.
+    // Spotları ikişerli gruplar halinde üretip sırayla birleştir.
+    const batchSize = 2;
+    const batches = [];
+    for (let i = 0; i < picked.length; i += batchSize) {
+      batches.push(picked.slice(i, i + batchSize));
+    }
+
+    try {
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        btn.textContent = `Sorular hazırlanıyor… ${batchIndex + 1}/${batches.length}`;
+        $("quizQuestion").textContent =
+          `${picked.length} sorunun ${Math.min((batchIndex + 1) * batchSize, picked.length)}/${picked.length} tanesi hazırlanıyor…`;
+
+        const spots = batch.map((q, i) =>
+          `${i + 1}) [${q.branch} - ${q.topic}] ${q.keyTakeaway}`
+        ).join("\n");
+
+        const prompt = `Aşağıdaki ${batch.length} TUS spot bilgisinin HER BİRİ için ayrı, gerçek TUS zorluğunda klinik vaka sorusu hazırla.
 
 KURALLAR:
-- Her soru orta-zor veya zor düzeyde, klinik vaka temelli olsun.
-- Anamnez, muayene ve gerektiğinde laboratuvar bulguları kullan.
+- Her spot için tam bir soru üret ve spotların sırasını koru.
+- Sorular orta-zor veya zor düzeyde, klinik vaka temelli olsun.
+- Vaka gereksiz uzamasın; soru kökü yaklaşık 70-120 kelimeyi geçmesin.
 - Güçlü ve tıbben makul çeldiriciler oluştur; yalnızca bir doğru seçenek olsun.
-- Her spot için bir soru üret ve spotların sırasını koru.
-- "question" alanına yalnızca vaka ve soru kökünü yaz. A, B, C, D, E seçeneklerini kesinlikle question alanına ekleme; yalnızca options nesnesine yaz.
-- "explanation" alanında yalnızca doğru cevabın neden doğru olduğunu 2-3 kısa cümleyle açıkla.
+- "question" alanına yalnızca vaka ve soru kökünü yaz. A-E seçeneklerini question alanına ekleme.
+- "explanation" alanında doğru cevabın neden doğru olduğunu 2 kısa cümleyle açıkla.
+- JSON'u tamamla; açıklama veya markdown ekleme.
 
 SADECE aşağıdaki yapıda geçerli JSON döndür:
 {
@@ -2487,7 +2507,7 @@ SADECE aşağıdaki yapıda geçerli JSON döndür:
       "question": "Klinik vaka ve soru kökü",
       "options": { "A": "Seçenek A", "B": "Seçenek B", "C": "Seçenek C", "D": "Seçenek D", "E": "Seçenek E" },
       "answer": "A",
-      "explanation": "Doğru cevabın kısa gerekçesi ve kritik TUS bilgisi."
+      "explanation": "Doğru cevabın kısa gerekçesi."
     }
   ]
 }
@@ -2495,23 +2515,26 @@ SADECE aşağıdaki yapıda geçerli JSON döndür:
 Spotlar:
 ${spots}`;
 
-    try {
-      const text = await callWorker({ task: "quiz_generate", prompt });
-      const data = parseBatch(text);
+        const text = await callWorker({ task: "quiz_generate", prompt });
+        const data = parseBatch(text);
 
-      if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") {
-        throw new Error((data.keyTakeaway || "") + " " + (data.explanation || ""));
+        if (data.branch === "SİSTEM MESAJI" || data.branch === "API HATASI" || data.branch === "Kota Doldu") {
+          throw new Error((data.keyTakeaway || "") + " " + (data.explanation || ""));
+        }
+
+        const arr = Array.isArray(data) ? data : (Array.isArray(data.questions) ? data.questions : []);
+        arr.forEach((item, idx) => {
+          const validated = validateGeneratedQuestion(item);
+          if (!validated) return;
+          const src = batch[(Number(item.no) || idx + 1) - 1] || batch[idx];
+          if (!src) return;
+          quizQueue.push({ src, data: validated });
+        });
+
+        if (arr.length !== batch.length) {
+          throw new Error(`Grup ${batchIndex + 1}: ${batch.length} soru istendi, ${arr.length} soru alındı. Tekrar deneyebilirsin.`);
+        }
       }
-
-      const arr = Array.isArray(data) ? data : (Array.isArray(data.questions) ? data.questions : []);
-      quizQueue = [];
-      arr.forEach((item, idx) => {
-        const validated = validateGeneratedQuestion(item);
-        if (!validated) return;
-        const src = picked[(Number(item.no) || idx + 1) - 1] || picked[idx];
-        if (!src) return;
-        quizQueue.push({ src, data: validated });
-      });
 
       if (!quizQueue.length) throw new Error("Yapay zeka soruları oluşturamadı, tekrar dene.");
       quizIndex = 0;

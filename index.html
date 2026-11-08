@@ -311,7 +311,7 @@
             <input type="file" id="examGalInput" accept="image/*" multiple class="hidden" onchange="handleExamFileSelect(event, 'img')">
           </label>
         </div>
-        <div class="hint">Galeriden aynı anda birden fazla görsel seçebilirsin. Fotoğraf çekersen her çekim mevcut listeye eklenir. En fazla 8 görsel.</div>
+        <div class="hint">Galeriden aynı anda birden fazla görsel seçebilirsin. Fotoğraf çekersen her çekim mevcut listeye eklenir. Tek denemede en fazla 60 görsel ekleyebilirsin; uygulama bunları 5'li gruplar halinde analiz eder.</div>
 
         <div id="examPreviewContainer" class="hidden">
           <div id="examImagePreviewList" class="exam-preview-grid"></div>
@@ -489,7 +489,7 @@
 
   let selectedImageBase64 = null, selectedImageMime = null;
   let examImages = [], examPdfText = null;
-  const MAX_EXAM_IMAGES = 8;
+  const MAX_EXAM_IMAGES = 60;
   let allQuestions = [];
   let allExams = [];
   let selectedBranchFilter = "All";
@@ -984,6 +984,12 @@
     `).join("");
   }
 
+  function chunkArray(items, size) {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+    return chunks;
+  }
+
   window.handleExamFileSelect = async (event, type) => {
     const files = Array.from(event.target.files || []);
     if (!files.length || analyzing) return;
@@ -1018,18 +1024,20 @@
     examPdfText = null;
     const remaining = MAX_EXAM_IMAGES - examImages.length;
     if (remaining <= 0) {
-      $("examScanStatus").textContent = `En fazla ${MAX_EXAM_IMAGES} görsel ekleyebilirsin. Önce mevcut dosyaları kaldır.`;
+      $("examScanStatus").textContent = `Bu deneme için ${MAX_EXAM_IMAGES} görsel sınırına ulaştın. Önce mevcut dosyaları kaldır.`;
       return;
     }
     const accepted = files.slice(0, remaining);
     const ignored = files.length - accepted.length;
-    $("examScanStatus").innerHTML = `<span class="spin"></span><span>${accepted.length} görsel hazırlanıyor…</span>`;
     try {
-      const prepared = await Promise.all(accepted.map(file => resizeExamImage(file, 2048, 0.82)));
-      examImages.push(...prepared);
-      renderExamImagePreviews();
-      const extra = ignored > 0 ? ` · ${ignored} görsel sınır nedeniyle eklenmedi` : "";
-      $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${examImages.length} görsel hazır${extra}</span>`;
+      for (let i = 0; i < accepted.length; i++) {
+        $("examScanStatus").innerHTML = `<span class="spin"></span><span>Görseller hazırlanıyor (${i + 1}/${accepted.length})…</span>`;
+        const prepared = await resizeExamImage(accepted[i], 1800, 0.76);
+        examImages.push(prepared);
+        renderExamImagePreviews();
+      }
+      const extra = ignored > 0 ? ` · ${ignored} görsel ${MAX_EXAM_IMAGES} sınırı nedeniyle eklenmedi` : "";
+      $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${examImages.length} görsel hazır${extra}. Analiz 5'li gruplar halinde yapılacak.</span>`;
     } catch (err) {
       console.error("Görsel hazırlama hatası:", err);
       $("examScanStatus").innerHTML = `<span style="color:var(--bad);">Görseller hazırlanamadı: ${esc(err.message)}</span>`;
@@ -1133,28 +1141,61 @@ ${chunks[i]}
           clearExamFile();
           $("examNoteInput").value = "";
         } else if (examImages.length) {
-          const prompt = `
-Sen uzman bir TUS koçusun. Yüklenen görseller aynı deneme sonuç karnesinin ardışık sayfaları olabilir. Tüm görselleri birlikte incele, sayfalar arasındaki ders/konu tablolarını birleştir ve aynı satırı iki kez sayma. Yalnızca görsellerde açıkça okunan verileri çıkar; emin olmadığın alanlara null yaz, tahmin etme.
-Ders neti = doğru - yanlış/4.
+          const imageBatches = chunkArray(examImages, 5);
+          const analyses = [];
+          for (let batchIndex = 0; batchIndex < imageBatches.length; batchIndex++) {
+            const batch = imageBatches[batchIndex];
+            btn.textContent = `Karne görselleri analiz ediliyor (${batchIndex + 1}/${imageBatches.length})…`;
+            const prompt = `
+Sen TUS deneme sonuç karnesi ve konu analiz tablolarını okuyan dikkatli bir veri çıkarma uzmanısın.
+Bu istek, aynı denemenin ${examImages.length} görselinden ${batchIndex * 5 + 1}-${batchIndex * 5 + batch.length}. görsel grubudur.
+Görselleri seçim sırasıyla incele. Bu gruptaki her ders başlığını ve altındaki HER KONU SATIRINI çıkar.
+- Ders ve konu adlarını görselde yazdığı biçimde aynen koru. Histoloji, Dahiliye Küçük Stajlar, Cerrahi Bilimler, Cerrahi Küçük Stajlar gibi başlıkları birleştirme veya başka derse dönüştürme.
+- Sütun sırası: Konu, Soru, Net, Doğru, Yanlış, Boş.
+- Ondalık virgülü sayıya çevir. Neti görselde okunuyorsa aynen al; doğru/yanlış/boş sayıları da ayrı ayrı al.
+- Aynı sayfa içinde tekrar eden satırı iki kez ekleme. Okunamayan sayısal alanı null bırak; tahmin etme.
+- Bu grup için genel deneme toplamlarını hesaplamaya çalışma; tüm gruplar birleştirildikten sonra uygulama hesaplayacak.
+- Yalnızca bu görsel grubunda gerçekten görünen konu satırlarını döndür.
+
 SADECE geçerli JSON döndür:
 {
-  "examTitle":"Sınav adı veya null", "examDate":"Tarih veya null", "score":null,
-  "totalNet":null, "totalCorrect":null, "totalWrong":null, "totalBlank":null,
-  "branches":[{"branch":"Anatomi","correct":3,"wrong":8,"blank":2,"net":1}],
-  "weakSubTopics":[{"branch":"Anatomi","subTopic":"Sinir Sistemi","correct":1,"wrong":3,"blank":1,"net":0.25}],
-  "coachAdvice":""
+  "examTitle": "Sınav adı veya null",
+  "examDate": null,
+  "score": null,
+  "totalNet": null,
+  "totalCorrect": null,
+  "totalWrong": null,
+  "totalBlank": null,
+  "branches": [],
+  "topics": [
+    { "branch": "Anatomi", "topic": "Sinir Sistemi", "questions": 5, "net": 0.25, "correct": 1, "wrong": 3, "blank": 1 }
+  ],
+  "weakSubTopics": [],
+  "coachAdvice": ""
 }
 Kullanıcı notu: ${note}
 `;
-          const raw = await callWorker({ task: "exam_report", prompt, images: examImages.map(({ imageBase64, mimeType }) => ({ imageBase64, mimeType })) });
-          const parsed = extractCleanJSON(raw);
-          if (!parsed || (!parsed.branches && parsed.totalNet === null && parsed.totalCorrect === null)) throw new Error("Karne verisi okunamadı. Lütfen daha net bir görsel yükle.");
-          const examDoc = { ...mergeExamAnalyses([parsed], note || "TUS Deneme Sınavı"), createdAtMs: Date.now() };
+            const raw = await callWorker({
+              task: "exam_report",
+              prompt,
+              images: batch.map(({ imageBase64, mimeType }) => ({ imageBase64, mimeType }))
+            });
+            const parsed = extractCleanJSON(raw);
+            if (!parsed || (!Array.isArray(parsed.topics) && !Array.isArray(parsed.branches))) {
+              throw new Error(`${batchIndex + 1}. görsel grubu okunamadı; hiçbir deneme kaydı oluşturulmadı.`);
+            }
+            analyses.push(parsed);
+          }
+
+          const examDoc = { ...mergeExamAnalyses(analyses, note || "TUS Deneme Sınavı"), createdAtMs: Date.now() };
+          if (!examDoc.topics.length && !examDoc.branches.length) {
+            throw new Error("Görseller okundu ancak ders/konu satırı çıkarılamadı.");
+          }
           const ref = await addDoc(collection(db, EXAM_COL), examDoc);
           allExams.unshift({ id: ref.id, ...examDoc });
           renderExams();
           const resCard = $("examResultCard");
-          resCard.innerHTML = `<div class="result-head"><div><h3>${esc(examDoc.examTitle)}</h3><div class="meta">${esc(examDoc.examDate)} • Puan: <b>${examDoc.score || "—"}</b></div></div><span class="meta" style="color:var(--ok)">✓ Karne Kaydedildi</span></div><div class="stat-grid"><div class="stat-box"><span class="val">${examDoc.totalNet}</span><span class="lbl">Net</span></div><div class="stat-box"><span class="val">${examDoc.totalCorrect}</span><span class="lbl">Doğru</span></div><div class="stat-box"><span class="val">${examDoc.totalWrong}</span><span class="lbl">Yanlış</span></div><div class="stat-box"><span class="val">${examDoc.totalBlank}</span><span class="lbl">Boş</span></div></div>`;
+          resCard.innerHTML = `<div class="result-head"><div><h3>${esc(examDoc.examTitle)}</h3><div class="meta">${esc(examDoc.examDate)} • Puan: <b>${examDoc.score || "—"}</b></div></div><span class="meta" style="color:var(--ok)">✓ Karne Kaydedildi</span></div><div class="stat-grid"><div class="stat-box"><span class="val">${examDoc.totalNet}</span><span class="lbl">Net</span></div><div class="stat-box"><span class="val">${examDoc.totalCorrect}</span><span class="lbl">Doğru</span></div><div class="stat-box"><span class="val">${examDoc.totalWrong}</span><span class="lbl">Yanlış</span></div><div class="stat-box"><span class="val">${examDoc.totalBlank}</span><span class="lbl">Boş</span></div></div><div class="meta">${imageBatches.length} görsel grubu birleştirildi; ${examDoc.topics.length} konu satırı kaydedildi.</div>`;
           resCard.classList.remove("hidden");
           clearExamFile();
           $("examNoteInput").value = "";
@@ -1185,17 +1226,29 @@ SADECE aşağıdaki geçerli JSON formatında yanıt ver:
 }
 Kullanıcı Notu: ${note}
 `;
-        const raw = await callWorker({ task: "exam_booklet", prompt, images: examImages.map(({ imageBase64, mimeType }) => ({ imageBase64, mimeType })) });
-        const rawParsed = extractCleanJSON(raw);
-        const items = Array.isArray(rawParsed) ? rawParsed : (Array.isArray(rawParsed?.items) ? rawParsed.items : (rawParsed?.branch ? [rawParsed] : []));
-
-        if (!items.length) throw new Error("Sayfada (-) işaretli veya hatalı soru tespit edilemedi. İstersen not kutusuna soru numaralarını (örn: 59, 64) yazıp tekrar dene.");
+        const imageBatches = chunkArray(examImages, 5);
+        const allItems = [];
+        for (let batchIndex = 0; batchIndex < imageBatches.length; batchIndex++) {
+          const batch = imageBatches[batchIndex];
+          btn.textContent = `Kitapçık analiz ediliyor (${batchIndex + 1}/${imageBatches.length})…`;
+          const batchPrompt = prompt + `\n\nBu, toplam ${examImages.length} sayfalık yüklemenin ${batchIndex * 5 + 1}-${batchIndex * 5 + batch.length}. sayfalarıdır. Görselleri kendi içlerinde seçim sırasıyla incele; soru numaralarını aynen koru.`;
+          const raw = await callWorker({
+            task: "exam_booklet",
+            prompt: batchPrompt,
+            images: batch.map(({ imageBase64, mimeType }) => ({ imageBase64, mimeType }))
+          });
+          const rawParsed = extractCleanJSON(raw);
+          const batchItems = Array.isArray(rawParsed) ? rawParsed : (Array.isArray(rawParsed?.items) ? rawParsed.items : (rawParsed?.branch ? [rawParsed] : []));
+          allItems.push(...batchItems);
+        }
+        const items = allItems;
+        if (!items.length) throw new Error("Yüklenen sayfalarda (-) işaretli veya hatalı soru tespit edilemedi. Soru numaralarını not kutusuna yazıp tekrar deneyebilirsin.");
 
         const savedItems = await saveExtractedItemsList(items, "exam", note || "Deneme Kitapçığı");
         const resCard = $("examResultCard");
         resCard.innerHTML = `
           <div style="font-weight:650; color:var(--accent); font-size:15px;">
-            🔥 Kitapçık sayfasından ${items.length} yanlış/boş soru yakalandı (${savedItems.savedCount} tanesi Deneme Yanlışı olarak Arşive ve Telegram'a eklendi)
+            🔥 ${examImages.length} kitapçık sayfasından ${items.length} yanlış/boş soru yakalandı (${savedItems.savedCount} tanesi Deneme Yanlışı olarak Arşive ve Telegram'a eklendi)
           </div>
           <hr class="batch-divider">
           ${savedItems.htmlList.join('<hr class="batch-divider">')}

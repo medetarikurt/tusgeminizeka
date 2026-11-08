@@ -115,7 +115,12 @@
     .scan { display: grid; gap: 12px; text-align: center; }
     .scan .hint { font-size: 13px; color: var(--muted); }
     #imagePreviewContainer, #examPreviewContainer { display: grid; gap: 10px; }
-    #imagePreviewContainer img, #examPreviewContainer img { width: 100%; max-height: 320px; object-fit: contain; border-radius: 10px; background: var(--raised); display: block; }
+    #imagePreviewContainer img { width: 100%; max-height: 320px; object-fit: contain; border-radius: 10px; background: var(--raised); display: block; }
+    .exam-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .exam-preview-item { min-width: 0; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); }
+    .exam-preview-item img { width: 100%; height: 150px; object-fit: contain; border-radius: 6px; display: block; }
+    .exam-preview-item .meta { display: block; margin-top: 4px; text-align: center; overflow-wrap: anywhere; }
+    @media (min-width: 520px) { .exam-preview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     .status-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: var(--muted); min-height: 24px; }
     .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -303,12 +308,13 @@
           <label class="btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>
             Galeri
-            <input type="file" id="examGalInput" accept="image/*" class="hidden" onchange="handleExamFileSelect(event, 'img')">
+            <input type="file" id="examGalInput" accept="image/*" multiple class="hidden" onchange="handleExamFileSelect(event, 'img')">
           </label>
         </div>
+        <div class="hint">Galeriden aynı anda birden fazla görsel seçebilirsin. Fotoğraf çekersen her çekim mevcut listeye eklenir. En fazla 8 görsel.</div>
 
         <div id="examPreviewContainer" class="hidden">
-          <img id="examImagePreview" class="hidden" alt="Deneme görseli">
+          <div id="examImagePreviewList" class="exam-preview-grid"></div>
           <div class="status-row" id="examScanStatus"></div>
           <button class="link danger" onclick="clearExamFile()">Dosyayı Kaldır</button>
         </div>
@@ -482,7 +488,8 @@
   const db = getFirestore(app);
 
   let selectedImageBase64 = null, selectedImageMime = null;
-  let examImageBase64 = null, examImageMime = null, examPdfText = null;
+  let examImages = [], examPdfText = null;
+  const MAX_EXAM_IMAGES = 8;
   let allQuestions = [];
   let allExams = [];
   let selectedBranchFilter = "All";
@@ -938,21 +945,64 @@
     };
   }
 
+  function resizeExamImage(file, maxDim = 2048, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error(file.name + " okunamadı."));
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error(file.name + " görsel olarak açılamadı."));
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            let w = img.width, h = img.height;
+            const scale = Math.min(1, maxDim / Math.max(w, h));
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("Görsel dönüştürücü başlatılamadı.");
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL("image/jpeg", quality);
+            resolve({ imageBase64: dataUrl.split(",")[1], mimeType: "image/jpeg", dataUrl, name: file.name });
+          } catch (err) { reject(err); }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderExamImagePreviews() {
+    const list = $("examImagePreviewList");
+    if (!list) return;
+    list.innerHTML = examImages.map((item, index) => `
+      <div class="exam-preview-item">
+        <img src="${item.dataUrl}" alt="Deneme görseli ${index + 1}">
+        <span class="meta">${index + 1}. görsel · ${esc(item.name)}</span>
+      </div>
+    `).join("");
+  }
+
   window.handleExamFileSelect = async (event, type) => {
-    const file = event.target.files[0];
-    if (!file || analyzing) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length || analyzing) return;
+    // Aynı fotoğrafı arka arkaya ekleyebilmek için input'u hemen sıfırla.
+    event.target.value = "";
     $("examPreviewContainer").classList.remove("hidden");
 
     if (type === "pdf") {
-      examImageBase64 = null; examImageMime = null;
-      $("examImagePreview").classList.add("hidden");
+      const file = files[0];
+      examImages = [];
+      examPdfText = null;
+      renderExamImagePreviews();
       $("examScanStatus").innerHTML = `<span class="spin"></span><span>PDF sayfaları okunuyor…</span>`;
       try {
         const { text, numPages, emptyPages } = await extractTextFromPdf(file);
         examPdfText = text;
         if (!text || text.replace(/\s/g, "").length < 40 || emptyPages === numPages) {
           examPdfText = null;
-          $("examScanStatus").innerHTML = `<span style="color:var(--bad);">PDF'de seçilebilir metin bulunamadı. Bu muhtemelen taranmış bir PDF. Sonuç karnesinin ekran görüntüsünü yükleyebilirsin.</span>`;
+          $("examScanStatus").innerHTML = `<span style="color:var(--bad);">PDF'de seçilebilir metin bulunamadı. Sonuç karnesinin ekran görüntülerini Galeri'den çoklu seçebilirsin.</span>`;
         } else {
           const warning = emptyPages > 0 ? ` • ${emptyPages} boş/metinsiz sayfa` : "";
           $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${esc(file.name)} (${numPages} sayfa okundu${warning})</span>`;
@@ -961,23 +1011,36 @@
         console.error("PDF okuma hatası:", err);
         $("examScanStatus").innerHTML = `<span style="color:var(--bad);">PDF okunamadı: ${esc(err.message)}</span>`;
       }
-    } else {
-      examPdfText = null;
-      examImageMime = "image/jpeg";
-      $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ Görsel yüksek çözünürlükte hazırlandı.</span>`;
-      // Kitapçık sayfasında 15+ soru olduğu için 2048px yüksek çözünürlük kullanıyoruz
-      resizeImageFile(file, 2048, 0.88, (base64, dataUrl) => {
-        examImageBase64 = base64;
-        $("examImagePreview").src = dataUrl;
-        $("examImagePreview").classList.remove("hidden");
-      });
+      return;
+    }
+
+    // Görsel seçimi PDF metnini temizler; yeni görseller mevcut listeye eklenir.
+    examPdfText = null;
+    const remaining = MAX_EXAM_IMAGES - examImages.length;
+    if (remaining <= 0) {
+      $("examScanStatus").textContent = `En fazla ${MAX_EXAM_IMAGES} görsel ekleyebilirsin. Önce mevcut dosyaları kaldır.`;
+      return;
+    }
+    const accepted = files.slice(0, remaining);
+    const ignored = files.length - accepted.length;
+    $("examScanStatus").innerHTML = `<span class="spin"></span><span>${accepted.length} görsel hazırlanıyor…</span>`;
+    try {
+      const prepared = await Promise.all(accepted.map(file => resizeExamImage(file, 2048, 0.82)));
+      examImages.push(...prepared);
+      renderExamImagePreviews();
+      const extra = ignored > 0 ? ` · ${ignored} görsel sınır nedeniyle eklenmedi` : "";
+      $("examScanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${examImages.length} görsel hazır${extra}</span>`;
+    } catch (err) {
+      console.error("Görsel hazırlama hatası:", err);
+      $("examScanStatus").innerHTML = `<span style="color:var(--bad);">Görseller hazırlanamadı: ${esc(err.message)}</span>`;
     }
   };
 
   window.clearExamFile = () => {
-    examImageBase64 = null; examImageMime = null; examPdfText = null;
+    examImages = [];
+    examPdfText = null;
     $("examPdfInput").value = ""; $("examCamInput").value = ""; $("examGalInput").value = "";
-    $("examImagePreview").classList.add("hidden");
+    $("examImagePreviewList").innerHTML = "";
     $("examPreviewContainer").classList.add("hidden");
     $("examScanStatus").innerHTML = "";
   };
@@ -985,7 +1048,7 @@
   window.analyzeExamInput = async () => {
     if (analyzing) return;
     const note = $("examNoteInput").value.trim();
-    if (!examPdfText && !examImageBase64) {
+    if (!examPdfText && !examImages.length) {
       alert("Lütfen önce deneme karnesi PDF'ini veya kitapçık fotoğrafını seç.");
       return;
     }
@@ -1069,9 +1132,9 @@ ${chunks[i]}
           resCard.classList.remove("hidden");
           clearExamFile();
           $("examNoteInput").value = "";
-        } else if (examImageBase64) {
+        } else if (examImages.length) {
           const prompt = `
-Sen uzman bir TUS koçusun. Aşağıdaki sonuç karnesi görselini analiz et. Yalnızca görselde açıkça okunan verileri çıkar; emin olmadığın alanlara null yaz, tahmin etme.
+Sen uzman bir TUS koçusun. Yüklenen görseller aynı deneme sonuç karnesinin ardışık sayfaları olabilir. Tüm görselleri birlikte incele, sayfalar arasındaki ders/konu tablolarını birleştir ve aynı satırı iki kez sayma. Yalnızca görsellerde açıkça okunan verileri çıkar; emin olmadığın alanlara null yaz, tahmin etme.
 Ders neti = doğru - yanlış/4.
 SADECE geçerli JSON döndür:
 {
@@ -1083,7 +1146,7 @@ SADECE geçerli JSON döndür:
 }
 Kullanıcı notu: ${note}
 `;
-          const raw = await callWorker({ task: "exam_report", prompt, imageBase64: examImageBase64, mimeType: examImageMime });
+          const raw = await callWorker({ task: "exam_report", prompt, images: examImages.map(({ imageBase64, mimeType }) => ({ imageBase64, mimeType })) });
           const parsed = extractCleanJSON(raw);
           if (!parsed || (!parsed.branches && parsed.totalNet === null && parsed.totalCorrect === null)) throw new Error("Karne verisi okunamadı. Lütfen daha net bir görsel yükle.");
           const examDoc = { ...mergeExamAnalyses([parsed], note || "TUS Deneme Sınavı"), createdAtMs: Date.now() };
@@ -1101,7 +1164,7 @@ Kullanıcı notu: ${note}
       } else {
         // MOD B: ÇÖZÜLMÜŞ KİTAPÇIK SAYFASI (+/- İŞARETLİ SORULAR)
         const prompt = `
-Sen uzman bir TUS hocasısın. Gönderilen deneme kitapçığı sayfasında çok sayıda soru var. Kullanıcının soru numaralarının yanına koyduğu el yazısı işaretlere dikkat et:
+Sen uzman bir TUS hocasısın. Gönderilen birden fazla kitapçık fotoğrafı varsa bunları aynı denemenin ardışık sayfaları olarak sırayla incele. Soru numaralarını sayfalar arasında karıştırma. Kullanıcının soru numaralarının yanına koyduğu el yazısı işaretlere dikkat et:
 - Yanında "-" (eksi), "X" (çarpı), "?" (soru işareti) olan VEYA yanlış işaretlenmiş / boş bırakılmış soruları tespit et.
 - Yanında "+" (artı) olan doğru çözülmüş soruları ATLA (eğer kullanıcı notunda özellikle bir soru numarası belirtmediyse).
 - Eğer kullanıcı notunda belirli soru numaraları yazdıysa (örn: 61, 64, 71) doğrudan o soruları çöz.
@@ -1122,7 +1185,7 @@ SADECE aşağıdaki geçerli JSON formatında yanıt ver:
 }
 Kullanıcı Notu: ${note}
 `;
-        const raw = await callWorker({ task: "exam_booklet", prompt, imageBase64: examImageBase64, mimeType: examImageMime });
+        const raw = await callWorker({ task: "exam_booklet", prompt, images: examImages.map(({ imageBase64, mimeType }) => ({ imageBase64, mimeType })) });
         const rawParsed = extractCleanJSON(raw);
         const items = Array.isArray(rawParsed) ? rawParsed : (Array.isArray(rawParsed?.items) ? rawParsed.items : (rawParsed?.branch ? [rawParsed] : []));
 

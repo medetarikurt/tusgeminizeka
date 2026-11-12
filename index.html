@@ -262,12 +262,12 @@
     <!-- 1. SEKME: SORU / SPOT EKLE -->
     <section id="sectionAdd">
       <div class="seg" role="group" aria-label="Eklenme modu">
-        <button id="modeQuestion" onclick="setInputMode('question')">Soru çözümle</button>
+        <button id="modeQuestion" class="on" onclick="setInputMode('question')">Soru çözümle</button>
         <button id="modeSpot" onclick="setInputMode('spot')">Spot çıkar</button>
       </div>
 
       <div class="card scan">
-        <h2 class="card-title" id="scanTitle">Görseli veya metni ekle</h2>
+        <h2 class="card-title" id="scanTitle">Soruyu tara</h2>
         <div class="pair">
           <label class="btn primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
@@ -280,8 +280,8 @@
             <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
           </label>
         </div>
-        <div class="hint" id="scanHint">Fotoğraf seçip üzerine not ekleyebilirsin.</div>
-        <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()" disabled>Önce işlem türünü seç</button>
+        <div class="hint" id="scanHint">Soru fotoğrafını yükle, Cmd/Ctrl+V ile yapıştır veya soru metnini yaz.</div>
+        <button id="analyzeBtn" class="btn primary" onclick="analyzeAndSaveQuestion()">Soruyu çözümle ve kaydet</button>
 
         <div id="imagePreviewContainer" class="hidden">
           <img id="imagePreview" alt="Seçilen soru görseli">
@@ -298,11 +298,6 @@
 
       <div id="resultCard" class="card stack hidden"></div>
 
-      <details class="card stack">
-        <summary>AI kullanım ve maliyet özeti</summary>
-        <div id="aiUsageSummary" class="meta">Henüz ölçülmüş AI isteği yok.</div>
-        <div class="meta">Tahmini API maliyeti bu tarayıcıda saklanır; Firebase veya Telegram'a gönderilmez. Kesin fatura Anthropic panelindedir.</div>
-      </details>
     </section>
 
     <!-- 2. SEKME: DENEME ANALİZİ (KARNE PDF + KİTAPÇIK +/- FOTOĞRAFI) -->
@@ -361,7 +356,7 @@
             <input type="file" id="examGalInput" accept="image/*" multiple class="hidden" onchange="handleExamFileSelect(event, 'img')">
           </label>
         </div>
-        <div class="hint">Galeriden aynı anda birden fazla görsel seçebilirsin. Fotoğraf çekersen her çekim mevcut listeye eklenir. Tek denemede en fazla 60 görsel ekleyebilirsin; uygulama bunları 5'li gruplar halinde analiz eder.</div>
+        <div class="hint">Galeriden aynı anda birden fazla görsel seçebilir ya da Cmd/Ctrl+V ile ekran görüntüsü yapıştırabilirsin. Fotoğraf çekersen her çekim mevcut listeye eklenir. Tek denemede en fazla 60 görsel ekleyebilirsin; uygulama bunları 5'li gruplar halinde analiz eder.</div>
 
         <div id="examPreviewContainer" class="hidden">
           <div id="examImagePreviewList" class="exam-preview-grid"></div>
@@ -542,7 +537,7 @@
     </button>
     <button id="tabArchiveBtn" onclick="switchTab('archive')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h14"/></svg>
-      Arşiv (<span id="archiveCount">0</span>)
+      <span>Arşiv (<span id="archiveCount">0</span>)</span>
     </button>
     <button id="tabQuizBtn" onclick="switchTab('quiz')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>
@@ -720,7 +715,7 @@
   let activeQuizQuestion = null, currentQuizData = null;
   let quizUserAnswer = null;
   let analyzing = false;
-  let currentInputMode = null;
+  let currentInputMode = "question";
   let currentExamMode = "report"; // 'report' | 'booklet'
   const lastShownQuestion = new Map(); // spot id -> bu oturumda en son gösterilen soru metni
 
@@ -918,7 +913,21 @@
 
   async function callWorker(body) {
     const payload = { ...body, task: body.task || "question_analyze" };
-    const res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    // "Failed to fetch" = istek Worker'a hiç ulaşmadı ya da Worker CORS başlığı olmadan hata döndü.
+    // Geçici kopmalara karşı bir kez daha dener, sonra anlaşılır bir hata verir.
+    let res;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (res.status >= 500 && attempt < 2) { await new Promise(r => setTimeout(r, 1500)); continue; }
+        break;
+      } catch (netErr) {
+        if (attempt < 2) { await new Promise(r => setTimeout(r, 1500)); continue; }
+        throw new Error(navigator.onLine === false
+          ? "İnternet bağlantısı yok."
+          : "Yapay zekâ sunucusuna ulaşılamadı (Failed to fetch). Worker çökmüş, zaman aşımına uğramış veya hata yanıtında CORS başlığı eksik olabilir; Cloudflare Worker loglarına bak.");
+      }
+    }
     if (!res.ok) {
       let detail = "";
       try { const errData = await res.json(); detail = errData.error?.message || errData.message || ""; } catch (e) {}
@@ -970,8 +979,8 @@
     $("modeSpot").classList.toggle("on", spotOnly);
     $("scanTitle").textContent = spotOnly ? "Görselden spot çıkar" : "Soruyu tara";
     $("scanHint").textContent = spotOnly
-      ? "Sendrom, tablo, şema veya ders görselinden TUS spotları çıkar."
-      : "Soru fotoğrafını yükle veya soru metnini yapıştır.";
+      ? "Sendrom, tablo, şema veya ders görselinden TUS spotları çıkar. Cmd/Ctrl+V ile görsel yapıştırabilirsin."
+      : "Soru fotoğrafını yükle, Cmd/Ctrl+V ile yapıştır veya soru metnini yaz.";
     $("analyzeBtn").disabled = false;
     $("analyzeBtn").textContent = spotOnly ? "Spot çıkar ve kaydet" : "Soruyu çözümle ve kaydet";
   };
@@ -995,17 +1004,36 @@
     reader.readAsDataURL(file);
   }
 
-  window.handleImageSelect = (event) => {
-    const file = event.target.files[0];
+  function loadQuestionImage(file, label = "Fotoğraf eklendi.") {
     if (!file || analyzing) return;
     selectedImageMime = "image/jpeg";
-    $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ Fotoğraf eklendi.</span>`;
+    $("scanStatus").innerHTML = `<span style="color:var(--ok);">✓ ${esc(label)}</span>`;
     $("imagePreviewContainer").classList.remove("hidden");
     resizeImageFile(file, 1280, 0.85, (base64, dataUrl) => {
       selectedImageBase64 = base64;
       $("imagePreview").src = dataUrl;
     });
-  };
+  }
+
+  window.handleImageSelect = (event) => loadQuestionImage(event.target.files[0]);
+
+  // Panodan görsel yapıştırma (Cmd/Ctrl+V): Soru ekle sekmesinde soru görseli olur,
+  // Deneme sekmesinde karne/kitapçık görsellerine eklenir. Metin yapıştırma normal çalışır.
+  document.addEventListener("paste", (event) => {
+    const items = Array.from(event.clipboardData?.items || []);
+    const files = items.filter(item => item.kind === "file" && item.type.startsWith("image/"))
+      .map(item => item.getAsFile()).filter(Boolean);
+    if (!files.length) return;
+    event.preventDefault();
+    if (analyzing) return;
+    if (!$("sectionExam").classList.contains("hidden")) {
+      handleExamFileSelect({ target: { files, value: "" } }, "img");
+    } else {
+      switchTab("add");
+      loadQuestionImage(files[0], "Panodaki görsel yapıştırıldı.");
+      $("imagePreviewContainer").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
 
   window.clearImage = () => {
     selectedImageBase64 = null; selectedImageMime = null;
@@ -2895,6 +2923,7 @@ Yalnızca JSON döndür.`;
     } catch (err) {
       $("quizQuestion").textContent = "Soru üretilemedi: " + err.message;
       $("quizOptions").innerHTML = "";
+      $("quizAskBox").classList.add("hidden");
     } finally {
       btn.disabled = false; btn.textContent = quizButtonLabel();
     }

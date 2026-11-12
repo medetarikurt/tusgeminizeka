@@ -201,12 +201,22 @@
     .day-bar.today { box-shadow: 0 0 0 1px var(--accent); }
 
     .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .goal-box { display: grid; gap: 6px; padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; }
+    .goal-box .trend-track { height: 10px; }
+    .goal-box.done .trend-fill { background: var(--ok); }
+    .kbd-hint { font-size: 12.5px; color: var(--muted); text-align: center; }
+    kbd { font: inherit; font-size: 11.5px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--surface); }
+    @media (hover: none) { .kbd-hint { display: none; } }
+    #dropOverlay {
+      position: fixed; inset: 12px; z-index: 100; display: grid; place-items: center;
+      border: 3px dashed var(--accent); border-radius: 20px; background: color-mix(in srgb, var(--bg) 82%, transparent);
+      font-size: 18px; font-weight: 650; color: var(--accent); text-align: center; padding: 24px; pointer-events: none;
+    }
     .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
     #quizModeHint { text-align: center; margin-top: -5px; }
     #quizWarn { padding: 8px 11px; background: var(--warn-soft); color: var(--warn); border-radius: 9px; font-size: 13.5px; }
     #quizContainer.quiz-fast .quiz-q { font-family: inherit; font-size: 19px; font-weight: 650; line-height: 1.45; }
     #quizContainer.quiz-fast .opt { padding: 10px 12px; min-height: 42px; }
-    #quizContainer.quiz-fast #quizAskBox { display: none; }
     .opt {
       display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
       background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; min-height: 48px;
@@ -225,8 +235,19 @@
     #quizNote { margin-top: 4px; font-size: 14px; color: var(--muted); }
     #quizExplanation { margin: 10px 0 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
     #quizAskBox { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
-    #quizAskInput, #personalNoteInput { width: 100%; min-height: 78px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--raised); }
-    #quizAskAnswer { margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--raised); white-space: pre-wrap; line-height: 1.6; }
+    #personalNoteInput { width: 100%; min-height: 78px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--raised); }
+    /* Takip soruları (cevaba yanıt) */
+    .chat { display: grid; gap: 8px; }
+    .chat-log { display: grid; gap: 8px; }
+    .chat-log:empty { display: none; }
+    .msg { padding: 10px 12px; border-radius: 12px; white-space: pre-wrap; line-height: 1.6; font-size: 15px; max-width: 100%; overflow-wrap: anywhere; }
+    .msg.user { background: var(--accent-soft); justify-self: end; max-width: 88%; }
+    .msg.bot { background: var(--raised); border: 1px solid var(--line); }
+    .msg .msg-actions { margin-top: 2px; }
+    .chat-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+    .chat-row textarea { min-height: 52px; }
+    .chat-row .btn { width: auto; padding: 0 18px; }
+    .ask-details { border-top: 1px solid var(--line); padding-top: 10px; }
     #questionInput, #examNoteInput { min-height: 72px; }
 
     nav {
@@ -466,6 +487,13 @@
           <h2 class="card-title">Çalışma istatistiği</h2>
           <span class="meta" id="statStreak">Seri: 0 gün</span>
         </div>
+        <div class="goal-box" id="goalBox">
+          <div class="bar">
+            <span id="goalText" class="meta">Günlük hedef: 0/40</span>
+            <button class="link" onclick="editDailyGoal()">Hedefi değiştir</button>
+          </div>
+          <div class="trend-track"><div id="goalFill" class="trend-fill" style="width:0%"></div></div>
+        </div>
         <div class="stat-grid" id="studyStatsGrid"></div>
         <div class="day-bars" id="dayBars" aria-label="Son 14 günün tekrar sayıları"></div>
         <div class="meta">Son 14 gün. Çubuk boyu tekrar sayısını, koyu kısım doğru cevapları gösterir.</div>
@@ -476,6 +504,11 @@
           <h2 class="card-title">Tekrar testi</h2>
           <div class="muted">Bugün vadesi gelen spot: <b id="dueCount">0</b></div>
         </div>
+        <div class="seg" id="quizPlanSeg" role="group" aria-label="Çalışma planı">
+          <button id="planGoal" onclick="setQuizPlan('goal')">🎯 Günlük hedef</button>
+          <button id="planFree" onclick="setQuizPlan('free')">Serbest</button>
+        </div>
+        <div id="quizPlanHint" class="meta"></div>
         <div class="seg" id="quizSourceSeg" role="group" aria-label="Test Kaynağı">
           <button class="on" onclick="setQuizSource('ALL')">Tüm Havuz</button>
           <button onclick="setQuizSource('exam')">🔥 Deneme Yanlışları</button>
@@ -492,6 +525,7 @@
           <button data-n="10" onclick="setQuizCount(10)">10 soru</button>
         </div>
         <button id="newQuizBtn" class="btn primary" onclick="generateQuiz()">Soru getir</button>
+        <div class="kbd-hint">Klavye: <kbd>A</kbd>–<kbd>E</kbd> veya <kbd>1</kbd>–<kbd>5</kbd> ile cevapla, <kbd>Enter</kbd> ile ilerle</div>
       </div>
 
       <div id="quizContainer" class="card stack hidden">
@@ -509,10 +543,8 @@
           <button id="nextQuizBtn" class="btn" onclick="nextQuiz()">Sıradaki soru</button>
         </div>
         <div id="quizAskBox" class="stack">
-          <h3 class="card-title">Bu soru hakkında asistana sor</h3>
-          <textarea id="quizAskInput" placeholder="Örn: Ferritin neden bu kadar yükseliyor? Bu tanıda fibrinojen neden düşer?"></textarea>
-          <button id="quizAskBtn" class="btn" onclick="askQuizAssistant()">Asistana sor</button>
-          <div id="quizAskAnswer" class="hidden" aria-live="polite"></div>
+          <h3 class="card-title">Anlamadığın yeri sor</h3>
+          <div id="quizChatSlot"></div>
           <div class="divider" style="border-top:1px solid var(--line); margin-top:8px;"></div>
           <h3 class="card-title">Bu spota kişisel notum</h3>
           <textarea id="personalNoteInput" placeholder="Bu spotla ilgili kendi notunu buraya yaz..."></textarea>
@@ -547,6 +579,7 @@
   </div>
 </nav>
 
+<div id="dropOverlay" class="hidden"></div>
 <div id="toast" class="hidden"><span id="toastText"></span><button id="toastUndo">Geri al</button></div>
 
 <script type="module">
@@ -723,6 +756,9 @@
   let quizCount = parseInt(localStorage.getItem("tus_quiz_count") || "5", 10);
   if (![1, 3, 5, 10].includes(quizCount)) quizCount = 5;
   let quizMode = localStorage.getItem("tus_quiz_mode") === "clinical" ? "clinical" : "rapid";
+  let quizPlan = localStorage.getItem("tus_quiz_plan") === "free" ? "free" : "goal";
+  let dailyGoal = parseInt(localStorage.getItem("tus_daily_goal") || "40", 10);
+  if (!Number.isFinite(dailyGoal) || dailyGoal < 1) dailyGoal = 40;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1019,20 +1055,69 @@
 
   // Panodan görsel yapıştırma (Cmd/Ctrl+V): Soru ekle sekmesinde soru görseli olur,
   // Deneme sekmesinde karne/kitapçık görsellerine eklenir. Metin yapıştırma normal çalışır.
-  document.addEventListener("paste", (event) => {
-    const items = Array.from(event.clipboardData?.items || []);
-    const files = items.filter(item => item.kind === "file" && item.type.startsWith("image/"))
-      .map(item => item.getAsFile()).filter(Boolean);
-    if (!files.length) return;
-    event.preventDefault();
-    if (analyzing) return;
+  // Panodan yapıştırılan veya sayfaya sürüklenen dosyaları açık sekmeye göre yönlendirir.
+  // Deneme sekmesi: görseller karne/kitapçık listesine, PDF karne olarak. Diğer sekmeler: ilk görsel soru görseli olur.
+  function handleIncomingFiles(files, label) {
+    if (analyzing || !files.length) return;
+    const pdf = files.find(f => f.type === "application/pdf");
+    const images = files.filter(f => f.type.startsWith("image/"));
     if (!$("sectionExam").classList.contains("hidden")) {
-      handleExamFileSelect({ target: { files, value: "" } }, "img");
-    } else {
-      switchTab("add");
-      loadQuestionImage(files[0], "Panodaki görsel yapıştırıldı.");
-      $("imagePreviewContainer").scrollIntoView({ behavior: "smooth", block: "center" });
+      if (pdf) handleExamFileSelect({ target: { files: [pdf], value: "" } }, "pdf");
+      else if (images.length) handleExamFileSelect({ target: { files: images, value: "" } }, "img");
+      $("examPreviewContainer").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
     }
+    if (!images.length) {
+      if (pdf) alert("Karne PDF'ini Deneme sekmesindeyken bırakabilirsin.");
+      return;
+    }
+    switchTab("add");
+    loadQuestionImage(images[0], images.length > 1 ? `${label} (yalnızca ilk görsel alındı)` : label);
+    $("imagePreviewContainer").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  document.addEventListener("paste", (event) => {
+    const files = Array.from(event.clipboardData?.items || [])
+      .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+      .map(item => item.getAsFile()).filter(Boolean);
+    if (!files.length) return; // metin yapıştırma normal çalışır
+    event.preventDefault();
+    handleIncomingFiles(files, "Panodaki görsel yapıştırıldı.");
+  });
+
+  let dragDepth = 0;
+  const draggingFiles = e => Array.from(e.dataTransfer?.types || []).includes("Files");
+  function showDropOverlay(show) {
+    const el = $("dropOverlay");
+    if (show) {
+      el.textContent = !$("sectionExam").classList.contains("hidden")
+        ? "Karne veya kitapçık görsellerini (ya da karne PDF'ini) eklemek için bırak"
+        : "Görseli soru olarak eklemek için bırak";
+    }
+    el.classList.toggle("hidden", !show);
+  }
+  document.addEventListener("dragenter", e => {
+    if (!draggingFiles(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    showDropOverlay(true);
+  });
+  document.addEventListener("dragover", e => {
+    if (!draggingFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  document.addEventListener("dragleave", e => {
+    if (!draggingFiles(e)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) showDropOverlay(false);
+  });
+  document.addEventListener("drop", e => {
+    if (!draggingFiles(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    showDropOverlay(false);
+    handleIncomingFiles(Array.from(e.dataTransfer.files || []), "Sürüklenen görsel eklendi.");
   });
 
   window.clearImage = () => {
@@ -1792,6 +1877,7 @@ Kullanıcı Notu: ${note}
       parsed.branch = normalizeBranch(parsed.branch);
       if (examMeta && !parsed.examKey) Object.assign(parsed, examMeta);
       let itemSaved = false;
+      let savedId = "";
 
       if (!["SİSTEM MESAJI", "API HATASI", "Kota Doldu"].includes(parsed.branch)) {
         const questionNo = parsed.questionNo ? String(parsed.questionNo) : "";
@@ -1810,6 +1896,7 @@ Kullanıcı Notu: ${note}
 
         if (doSave) {
           const rawSubTopic = parsed.subTopic || "";
+
           const newDoc = {
             branch: parsed.branch || "Genel",
             topic: parsed.topic || "Genel",
@@ -1841,6 +1928,7 @@ Kullanıcı Notu: ${note}
 
           const docRef = await addDoc(collection(db, COL), newDoc);
           allQuestions.unshift(toLocalItem(docRef.id, newDoc));
+          savedId = docRef.id;
           itemSaved = true;
           savedCount++;
 
@@ -1865,6 +1953,13 @@ Kullanıcı Notu: ${note}
             <div class="reading pre">${fmt(parsed.explanation || "")}</div>
           </div>
           ${parsed.note ? `<div class="meta">Not: ${esc(parsed.note)}</div>` : ""}
+          ${(() => {
+            const key = savedId ? `r-${savedId}` : `r-t${Date.now()}${i}`;
+            const ctx = { branch: parsed.branch, topic: parsed.topic, subTopicRaw: parsed.subTopic, rawQuestion: rawTextLabel,
+              keyTakeaway: parsed.keyTakeaway, aiExplanation: parsed.explanation };
+            registerChat(key, savedId, () => spotContext(allQuestions.find(q => q.id === savedId) || ctx));
+            return `<details class="ask-details" ${items.length === 1 ? "open" : ""}><summary>💬 Anlamadığın yeri sor</summary>${chatBoxHtml(key)}</details>`;
+          })()}
         </div>
       `);
     }
@@ -2493,6 +2588,11 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
         <details>
           <summary>Çözümü göster</summary>
           <div class="reading pre">${fmt(q.aiExplanation)}</div>
+          <div style="margin-top:12px">${(() => {
+            const key = `a-${q.id}`;
+            registerChat(key, q.id, () => spotContext(allQuestions.find(x => x.id === q.id) || q));
+            return chatBoxHtml(key);
+          })()}</div>
         </details>
       </article>`).join("");
   }
@@ -2503,9 +2603,28 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     try {
       const snap = await getDoc(doc(db, STATS_COL, STATS_DOC));
       statsDays = snap.exists() ? (snap.data().days || {}) : {};
+      const remoteGoal = snap.exists() ? Number(snap.data().dailyGoal) : NaN;
+      if (Number.isFinite(remoteGoal) && remoteGoal > 0) {
+        dailyGoal = remoteGoal;
+        localStorage.setItem("tus_daily_goal", String(dailyGoal));
+      }
     } catch (e) { console.warn("İstatistik yüklenemedi:", e); }
     renderStats();
   }
+
+  const todayReviewed = () => statsDays[dayKeyAgo(0)]?.reviewed || 0;
+
+  window.editDailyGoal = async () => {
+    const value = prompt("Günlük tekrar hedefin kaç soru olsun?", String(dailyGoal));
+    if (value === null) return;
+    const n = parseInt(value, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 500) { alert("1 ile 500 arasında bir sayı gir."); return; }
+    dailyGoal = n;
+    localStorage.setItem("tus_daily_goal", String(n));
+    renderStats();
+    try { await setDoc(doc(db, STATS_COL, STATS_DOC), { dailyGoal: n }, { merge: true }); }
+    catch (e) { console.warn("Hedef kaydedilemedi:", e); }
+  };
 
   async function recordReview(isCorrect) {
     const k = dayKey();
@@ -2522,6 +2641,14 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   function renderStats() {
     const grid = $("studyStatsGrid");
     if (!grid) return;
+    const doneToday = todayReviewed();
+    const goalPct = Math.min(100, doneToday / dailyGoal * 100);
+    $("goalText").innerHTML = doneToday >= dailyGoal
+      ? `🎯 Günlük hedef tamam: <b>${doneToday}/${dailyGoal}</b>`
+      : `Günlük hedef: <b>${doneToday}/${dailyGoal}</b> · ${dailyGoal - doneToday} kaldı`;
+    $("goalFill").style.width = goalPct + "%";
+    $("goalBox").classList.toggle("done", doneToday >= dailyGoal);
+    updateQuizPlanUI();
     const today = statsDays[dayKeyAgo(0)] || {};
     const reviewed = today.reviewed || 0, correct = today.correct || 0;
     let week = 0, weekCorrect = 0;
@@ -2559,7 +2686,58 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     btns[1].classList.toggle("on", src === "exam");
   };
 
-  const quizButtonLabel = () => quizMode === "rapid" ? "Hızlı teste başla" : "Klinik soru getir";
+  const quizButtonLabel = () => {
+    if (quizPlan === "goal") {
+      const left = dailyGoal - todayReviewed();
+      return left > 0 ? `🎯 Hedefe devam et (${left} kaldı)` : "🎯 Hedef tamam, ekstra çalış";
+    }
+    return quizMode === "rapid" ? "Hızlı teste başla" : "Klinik soru getir";
+  };
+
+  function updateQuizPlanUI() {
+    const goal = quizPlan === "goal";
+    $("planGoal").classList.toggle("on", goal);
+    $("planFree").classList.toggle("on", !goal);
+    $("quizPlanHint").textContent = goal
+      ? "Vadesi gelenler arasından önce deneme yanlışları ve son denemede zayıf çıkan dersler gelir; set, hedefte kalan sayıyı aşmaz."
+      : "Vadesi gelen spotlardan karışık seçilir.";
+    const btn = $("newQuizBtn");
+    if (btn && !btn.disabled) btn.textContent = quizButtonLabel();
+  }
+
+  window.setQuizPlan = (plan) => {
+    quizPlan = plan === "free" ? "free" : "goal";
+    localStorage.setItem("tus_quiz_plan", quizPlan);
+    updateQuizPlanUI();
+  };
+
+  // Son denemede en çok yanlış/boş çıkan 3 ders (karne yoksa deneme soru kayıtlarından).
+  function weakBranchSet() {
+    const set = new Set();
+    if (allExams.length) {
+      const latest = [...allExams].sort(compareExams).pop();
+      (latest.branches || [])
+        .map(b => ({ b: b.branch, s: (finiteNumber(b.wrong) || 0) * 1.25 + (finiteNumber(b.blank) || 0) }))
+        .filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 3).forEach(x => set.add(normalizeBranch(x.b)));
+    }
+    if (!set.size) {
+      const counts = {};
+      allQuestions.filter(q => q.sourceType === "exam" && (q.examStatus === "wrong" || q.examStatus === "empty"))
+        .forEach(q => { counts[q.branch] = (counts[q.branch] || 0) + 1; });
+      Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3).forEach(([b]) => set.add(b));
+    }
+    return set;
+  }
+
+  function priorityScore(q, weak, now) {
+    const overdueDays = q.nextReview > 0 ? Math.min(10, Math.max(0, (now - q.nextReview) / DAY)) : 10;
+    return (q.sourceType === "exam" ? 3 : 0)
+      + (weak.has(q.branch) ? 2 : 0)
+      + (q.examStatus === "wrong" ? 0.5 : 0)
+      + overdueDays * 0.3
+      + (MAX_STREAK - (q.box || 0)) * 0.15
+      + Math.random() * 0.3; // aynı puanlılar arasında çeşitlilik
+  }
 
   window.setQuizMode = (mode) => {
     quizMode = mode === "clinical" ? "clinical" : "rapid";
@@ -2586,6 +2764,24 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       if (!active.length) { alert("Henüz 'Deneme Yanlışı' olarak kaydedilmiş aktif bir spotun yok."); return null; }
     }
     if (!active.length) { alert("Test için arşivinde çalışılacak en az bir spot olmalı."); return null; }
+    if (quizPlan === "goal") {
+      const left = dailyGoal - todayReviewed();
+      if (left <= 0 && !confirm("🎯 Bugünkü hedefini tamamladın. Yine de devam etmek ister misin?")) return null;
+      const take = left > 0 ? Math.min(n, left) : n;
+      let goalPool = active.filter(q => q.nextReview <= now);
+      if (!goalPool.length) {
+        if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
+        goalPool = [...active];
+      }
+      const weak = weakBranchSet();
+      const top = goalPool.map(q => ({ q, s: priorityScore(q, weak, now) }))
+        .sort((a, b) => b.s - a.s).slice(0, take).map(x => x.q);
+      for (let i = top.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [top[i], top[j]] = [top[j], top[i]];
+      }
+      return top;
+    }
     let pool = active.filter(q => q.nextReview <= now).sort((a, b) => a.nextReview - b.nextReview);
     if (!pool.length) {
       if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
@@ -2753,17 +2949,24 @@ Yalnızca JSON döndür.`;
     currentQuizData = data;
     lastShownQuestion.set(src.id, data.question);
     $("quizContainer").classList.toggle("quiz-fast", quizMode === "rapid");
+    // Hızlı modda soru kutusu cevaptan sonra açılır; klinik modda baştan açık.
     $("quizAskBox").classList.toggle("hidden", quizMode === "rapid");
     quizUserAnswer = null;
-    $("quizAskInput").value = "";
+    const chatId = `q-${quizIndex}-${src.id}`;
+    registerChat(chatId, src.id, () => {
+      const optionsText = Object.entries(data.options || {}).map(([k, v]) => `${k}) ${v}`).join("\n");
+      const answered = quizUserAnswer !== null;
+      return spotContext(allQuestions.find(q => q.id === src.id) || src) +
+        `\n\nTest sorusu: ${data.question}\nSeçenekler:\n${optionsText}` +
+        (answered
+          ? `\nÖğrencinin cevabı: ${quizUserAnswer}\nDoğru cevap: ${data.answer}\nÇözüm: ${data.explanation || ""}`
+          : "\n(Öğrenci henüz cevaplamadı; doğru cevabı açıkça söyleme, yönlendirici ipucu ver.)");
+    });
+    $("quizChatSlot").innerHTML = chatBoxHtml(chatId, "Örn: C şıkkı neden yanlış? Bu mekanizmayı tekrar anlatır mısın?");
     $("personalNoteInput").value = activeQuizQuestion.personalNote || "";
     $("personalNoteStatus").textContent = "";
     $("savePersonalNoteBtn").disabled = false;
     $("savePersonalNoteBtn").textContent = "Notu kaydet";
-    $("quizAskAnswer").textContent = "";
-    $("quizAskAnswer").classList.add("hidden");
-    $("quizAskBtn").disabled = false;
-    $("quizAskBtn").textContent = "Asistana sor";
 
     $("quizResult").classList.add("hidden");
     $("quizSubBadge").textContent = `${quizMode === "rapid" ? "⚡ Hızlı Spot" : "Klinik Vaka"} · ` + [src.branch, src.topic].filter(Boolean).join(", ") + ` (${quizIndex + 1}/${quizQueue.length})`;
@@ -2837,6 +3040,7 @@ Yalnızca JSON döndür.`;
     if (!picked) return;
 
     const mode = quizMode;
+    currentQuizData = null; activeQuizQuestion = null;
     const btn = $("newQuizBtn");
     btn.disabled = true; btn.textContent = "Sorular hazırlanıyor…";
     $("quizContainer").classList.remove("hidden");
@@ -2987,12 +3191,14 @@ Yalnızca JSON döndür.`;
       note = "İlerleme kaydedilemedi (bağlantını kontrol et). " + note;
     }
 
+    if (todayReviewed() === dailyGoal) note += " 🎯 Bugünkü hedefini tamamladın!";
     const res = $("quizResult");
     res.className = isCorrect ? "right" : "wrong";
     $("quizResultTitle").textContent = isCorrect ? `Doğru, cevap ${correctKey}` : `Yanlış, doğru cevap ${correctKey}`;
     $("quizNote").textContent = note;
     $("quizExplanation").innerHTML = fmt(currentQuizData.explanation);
     res.classList.remove("hidden");
+    $("quizAskBox").classList.remove("hidden");
     res.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -3014,37 +3220,155 @@ Yalnızca JSON döndür.`;
     }
   };
 
-  window.askQuizAssistant = async () => {
-    const questionText = $("quizAskInput").value.trim();
-    if (!questionText || !currentQuizData) return;
+  // ===================== TAKİP SORULARI (CEVABA YANIT) =====================
+  // Soru çözümü, arşivdeki spot ve test sorusunun altında çok turlu soru-cevap.
+  const chats = new Map(); // key -> { spotId, getContext, messages: [{ role, text }], busy }
 
-    const btn = $("quizAskBtn");
-    const answerBox = $("quizAskAnswer");
-    btn.disabled = true; btn.textContent = "Yanıt hazırlanıyor…";
-    answerBox.classList.remove("hidden");
-    answerBox.textContent = "Asistan düşünüyor…";
+  function registerChat(key, spotId, getContext) {
+    const existing = chats.get(key);
+    if (existing) { existing.getContext = getContext; if (spotId) existing.spotId = spotId; return; }
+    chats.set(key, { spotId: spotId || "", getContext, messages: [], busy: false });
+  }
 
-    const optionsText = Object.entries(currentQuizData.options || {})
-      .map(([key, value]) => `${key}) ${value}`).join("\n");
-    const answered = quizUserAnswer !== null;
-    const context = `Soru: ${currentQuizData.question}\nSeçenekler:\n${optionsText}` +
-      (answered ? `\nKullanıcının işaretlediği cevap: ${quizUserAnswer}\nDoğru cevap: ${currentQuizData.answer}\nÇözüm: ${currentQuizData.explanation || ""}` : "");
+  function spotContext(q, extra = "") {
+    return [
+      `Ders/konu: ${[q.branch, q.topic, q.subTopicRaw ?? q.subTopic].filter(Boolean).join(" > ")}`,
+      q.rawQuestion && q.rawQuestion !== "TUS Sorusu" ? `Orijinal soru/not: ${q.rawQuestion}` : "",
+      `Spot: ${q.keyTakeaway || ""}`,
+      `Açıklama: ${q.aiExplanation || q.explanation || ""}`,
+      q.personalNote ? `Öğrencinin kendi notu: ${q.personalNote}` : "",
+      extra
+    ].filter(Boolean).join("\n");
+  }
 
-    const prompt = `Sen TUS hazırlık asistanısın. Aşağıdaki soru hakkında kullanıcının sorusunu yanıtla. Türkçe, anlaşılır ve öğretici ol.\n\n${context}\n\nKullanıcının sorusu: ${questionText}\n\nSADECE şu JSON formatında yanıt ver: {"answer":"Yanıtın"}`;
+  function chatLogHtml(key) {
+    const chat = chats.get(key);
+    if (!chat) return "";
+    return chat.messages.map((m, i) => m.role === "user"
+      ? `<div class="msg user">${esc(m.text)}</div>`
+      : `<div class="msg bot">${fmt(m.text)}${chat.spotId && !m.error
+          ? `<div class="msg-actions"><button class="link" onclick="saveChatToNote('${key}', ${i})" ${m.saved ? "disabled" : ""}>${m.saved ? "✓ Spota not olarak eklendi" : "Spota not olarak ekle"}</button></div>`
+          : ""}</div>`
+    ).join("") + (chat.busy ? `<div class="msg bot meta"><span class="spin" style="display:inline-block;vertical-align:-3px;margin-right:8px"></span>Asistan düşünüyor…</div>` : "");
+  }
+
+  function chatBoxHtml(key, placeholder = "Anlamadığın yeri sor…") {
+    return `<div class="chat">
+      <div class="chat-log" id="chatlog-${key}" aria-live="polite">${chatLogHtml(key)}</div>
+      <div class="chat-row">
+        <textarea class="chat-input" id="chatin-${key}" data-chat="${key}" rows="2" placeholder="${esc(placeholder)}"></textarea>
+        <button class="btn primary" id="chatbtn-${key}" onclick="sendChat('${key}')" ${chats.get(key)?.busy ? "disabled" : ""}>Sor</button>
+      </div>
+      <div class="meta">Enter gönderir, Shift+Enter yeni satır. Cevaba yanıt yazarak devam edebilirsin.</div>
+    </div>`;
+  }
+
+  function refreshChat(key) {
+    const log = $("chatlog-" + key);
+    if (log) log.innerHTML = chatLogHtml(key);
+    const btn = $("chatbtn-" + key);
+    if (btn) btn.disabled = !!chats.get(key)?.busy;
+  }
+
+  window.sendChat = async (key) => {
+    const chat = chats.get(key);
+    const input = $("chatin-" + key);
+    if (!chat || !input || chat.busy) return;
+    const question = input.value.trim();
+    if (!question) return;
+    input.value = "";
+    const history = chat.messages.slice(-8)
+      .filter(m => !m.error)
+      .map(m => `${m.role === "user" ? "Öğrenci" : "Asistan"}: ${m.text}`).join("\n");
+    chat.messages.push({ role: "user", text: question });
+    chat.busy = true;
+    refreshChat(key);
+
+    const prompt = `Sen sabırlı ve net anlatan bir TUS hocasısın. Öğrenci aşağıdaki içerikte anlamadığı yerleri soruyor.
+KURALLAR:
+- Türkçe, sade ve öğretici yaz; önce doğrudan cevabı ver, sonra gerekiyorsa mekanizmayı adım adım açıkla.
+- En fazla 6-8 cümle. Önemli terimleri **kalın** yaz. Gerekirse kısa bir akılda tutma ipucu ekle.
+- Önceki konuşmayı dikkate al; öğrenci önceki cevabına yanıt veriyorsa oradan devam et.
+- Bağlamda olmayan bilgi gerekiyorsa genel tıp bilginle cevapla; emin olmadığın noktayı açıkça belirt.
+
+BAĞLAM:
+${typeof chat.getContext === "function" ? chat.getContext() : ""}
+${history ? `\nÖNCEKİ KONUŞMA:\n${history}\n` : ""}
+ÖĞRENCİNİN YENİ MESAJI: ${question}
+
+SADECE şu JSON formatında yanıt ver: {"answer":"Yanıtın"}`;
 
     try {
       const raw = await callWorker({ task: "quiz_followup", prompt });
-      const parsed = parseBatch(raw);
-      answerBox.textContent = typeof parsed.answer === "string" ? parsed.answer : "Yanıt okunamadı.";
+      let answer = "";
+      try { const parsed = parseBatch(raw); if (typeof parsed.answer === "string") answer = parsed.answer; } catch (e) {}
+      if (!answer) answer = String(raw || "").replace(/```(?:json)?/gi, "").trim();
+      chat.messages.push({ role: "bot", text: answer || "Yanıt okunamadı." });
     } catch (err) {
-      answerBox.textContent = "Yanıt alınamadı: " + err.message;
+      chat.messages.push({ role: "bot", text: "Yanıt alınamadı: " + err.message, error: true });
     } finally {
-      btn.disabled = false; btn.textContent = "Tekrar sor";
+      chat.busy = false;
+      refreshChat(key);
+      $("chatin-" + key)?.focus();
     }
   };
 
+  // Asistanın cevabını (ve sorduğun soruyu) spotun kişisel notuna ekler.
+  window.saveChatToNote = async (key, index) => {
+    const chat = chats.get(key);
+    const msg = chat?.messages[index];
+    if (!chat || !msg || msg.saved || !chat.spotId) return;
+    const q = allQuestions.find(x => x.id === chat.spotId);
+    if (!q) { alert("Bu spot arşivde bulunamadı."); return; }
+    const asked = chat.messages.slice(0, index).reverse().find(m => m.role === "user");
+    const entry = `S: ${asked ? asked.text : ""}\nC: ${msg.text}`;
+    const note = [q.personalNote, entry].filter(Boolean).join("\n\n");
+    try {
+      await updateDoc(doc(db, COL, q.id), { personalNote: note });
+      q.personalNote = note;
+      msg.saved = true;
+      refreshChat(key);
+      if (activeQuizQuestion && activeQuizQuestion.id === q.id) {
+        activeQuizQuestion.personalNote = note;
+        $("personalNoteInput").value = note;
+      }
+    } catch (e) { alert("Not kaydedilemedi. Tekrar dene."); }
+  };
+
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (!t?.classList?.contains("chat-input") || e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    sendChat(t.dataset.chat);
+  });
+
+  // Test sekmesinde klavye: A–E veya 1–5 cevap verir, Enter sonraki soruya geçer / yeni set başlatır.
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+    if ($("sectionQuiz").classList.contains("hidden")) return;
+    const t = e.target;
+    const tag = (t?.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select" || t?.isContentEditable) return;
+    const resultShown = !$("quizResult").classList.contains("hidden");
+    const quizBtn = $("newQuizBtn");
+
+    if (e.key === "Enter") {
+      if (tag === "button" && !t.disabled) return; // odaktaki butonun kendi tıklaması çalışsın
+      if (resultShown) { e.preventDefault(); nextQuiz(); return; }
+      if (!currentQuizData && !quizBtn.disabled) { e.preventDefault(); generateQuiz(); }
+      return;
+    }
+    if (!currentQuizData || resultShown) return;
+    let key = e.key.toUpperCase();
+    if (/^[1-5]$/.test(key)) key = "ABCDE"[Number(key) - 1];
+    if (!/^[A-E]$/.test(key)) return;
+    const optBtn = document.querySelector(`#quizOptions .opt[data-key="${key}"]`);
+    if (optBtn && !optBtn.disabled) { e.preventDefault(); optBtn.blur(); optBtn.click(); }
+  });
+
   setQuizCount(quizCount);
   setQuizMode(quizMode);
+  setQuizPlan(quizPlan);
   renderAiUsage();
   renderStats();
 

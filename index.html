@@ -199,6 +199,11 @@
     .day-bar { position: relative; background: var(--accent-soft); border-radius: 4px 4px 2px 2px; min-height: 3px; overflow: hidden; }
     .day-bar .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); }
     .day-bar.today { box-shadow: 0 0 0 1px var(--accent); }
+    .day-dots { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 4px; }
+    .day-dot { height: 6px; border-radius: 3px; background: var(--line); }
+    .day-dot.met { background: var(--ok); }
+    .day-dot.partial { background: var(--warn); }
+    .day-dot.na { background: transparent; }
 
     .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .goal-box { display: grid; gap: 6px; padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; }
@@ -214,6 +219,7 @@
     }
     .quiz-q { font-family: var(--serif); font-size: 18px; line-height: 1.65; margin: 0; }
     #quizModeHint { text-align: center; margin-top: -5px; }
+    #quizContainer { scroll-margin-top: calc(12px + env(safe-area-inset-top, 0px)); }
     #quizWarn { padding: 8px 11px; background: var(--warn-soft); color: var(--warn); border-radius: 9px; font-size: 13.5px; }
     #quizContainer.quiz-fast .quiz-q { font-family: inherit; font-size: 19px; font-weight: 650; line-height: 1.45; }
     #quizContainer.quiz-fast .opt { padding: 10px 12px; min-height: 42px; }
@@ -495,8 +501,11 @@
           <div class="trend-track"><div id="goalFill" class="trend-fill" style="width:0%"></div></div>
         </div>
         <div class="stat-grid" id="studyStatsGrid"></div>
-        <div class="day-bars" id="dayBars" aria-label="Son 14 günün tekrar sayıları"></div>
-        <div class="meta">Son 14 gün. Çubuk boyu tekrar sayısını, koyu kısım doğru cevapları gösterir.</div>
+        <div>
+          <div class="day-bars" id="dayBars" aria-label="Son 14 günün tekrar sayıları"></div>
+          <div class="day-dots" id="dayDots" aria-label="Son 14 günün hedef durumu"></div>
+        </div>
+        <div class="meta">Son 14 gün. Çubuk boyu o gün çözdüğün tekrar sayısını, koyu kısım doğruları gösterir. Alttaki çizgi günün hedefinin dolup dolmadığını gösterir: yeşil tamam, turuncu yarım, gri eksik. Fazla çözdüklerin önce geride kalan günleri, sonra bugünü, sonra sonraki günleri doldurur.</div>
       </div>
 
       <div class="card stack center">
@@ -2614,6 +2623,48 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
   const todayReviewed = () => statsDays[dayKeyAgo(0)]?.reviewed || 0;
 
+  // Hedef defteri: son 14 gündeki tüm tekrarlar tek havuzda toplanır ve sırayla
+  // en eski günden başlayarak her güne "dailyGoal" kadar dağıtılır.
+  // Böylece dün çözemediğin hedef bugünkü fazlalıkla kapanır; bugün de dolunca
+  // artan kısım sonraki günlere (yarın, öbür gün…) avans olarak yazılır.
+  // Defter, ilk tekrar yaptığın günden önceye borç yazmaz.
+  const LEDGER_WINDOW = 14;
+  function goalLedger() {
+    const firstKey = Object.keys(statsDays).filter(k => (statsDays[k]?.reviewed || 0) > 0).sort()[0];
+    let span = 1;
+    if (firstKey) {
+      for (let i = LEDGER_WINDOW - 1; i >= 0; i--) {
+        if (dayKeyAgo(i) >= firstKey) { span = i + 1; break; }
+      }
+    }
+    let pool = 0;
+    for (let i = 0; i < span; i++) pool += statsDays[dayKeyAgo(i)]?.reviewed || 0;
+    const days = [];
+    for (let ago = span - 1; ago >= 0; ago--) {
+      const idx = span - 1 - ago;
+      const filled = Math.max(0, Math.min(dailyGoal, pool - idx * dailyGoal));
+      days.push({ ago, key: dayKeyAgo(ago), filled, done: filled >= dailyGoal });
+    }
+    const today = days[days.length - 1];
+    const backlog = days.slice(0, -1).reduce((sum, d) => sum + (dailyGoal - d.filled), 0);
+    const ahead = Math.max(0, pool - span * dailyGoal);
+    return {
+      days, span, pool, today, backlog, ahead,
+      leftToday: Math.max(0, span * dailyGoal - pool),   // geride kalanlar + bugünün eksiği
+      aheadDays: Math.floor(ahead / dailyGoal),            // tamamen dolan gelecek gün sayısı
+      aheadPartial: ahead % dailyGoal                       // sıradaki gelecek günün doluluğu
+    };
+  }
+
+  function aheadText(L) {
+    if (!L.ahead) return "";
+    const dayName = n => n === 1 ? "yarın" : n === 2 ? "öbür gün" : `${n} gün sonrası`;
+    const parts = [];
+    if (L.aheadDays) parts.push(L.aheadDays === 1 ? "yarın tamam" : `${L.aheadDays} gün ileriye tamam`);
+    if (L.aheadPartial) parts.push(`${dayName(L.aheadDays + 1)} ${L.aheadPartial}/${dailyGoal}`);
+    return parts.join(", ");
+  }
+
   window.editDailyGoal = async () => {
     const value = prompt("Günlük tekrar hedefin kaç soru olsun?", String(dailyGoal));
     if (value === null) return;
@@ -2641,22 +2692,31 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   function renderStats() {
     const grid = $("studyStatsGrid");
     if (!grid) return;
-    const doneToday = todayReviewed();
-    const goalPct = Math.min(100, doneToday / dailyGoal * 100);
-    $("goalText").innerHTML = doneToday >= dailyGoal
-      ? `🎯 Günlük hedef tamam: <b>${doneToday}/${dailyGoal}</b>`
-      : `Günlük hedef: <b>${doneToday}/${dailyGoal}</b> · ${dailyGoal - doneToday} kaldı`;
-    $("goalFill").style.width = goalPct + "%";
-    $("goalBox").classList.toggle("done", doneToday >= dailyGoal);
+    const L = goalLedger();
+    const ahead = aheadText(L);
+    let goalHtml;
+    if (L.backlog > 0) {
+      goalHtml = `Geride kalan günlerden <b>${L.backlog}</b> eksik var; çözdüklerin önce onu kapatır. Bugün: <b>${L.today.filled}/${dailyGoal}</b> · toplam ${L.leftToday} kaldı`;
+    } else if (L.leftToday > 0) {
+      goalHtml = `Günlük hedef: <b>${L.today.filled}/${dailyGoal}</b> · ${L.leftToday} kaldı`;
+    } else {
+      goalHtml = `🎯 Bugün tamam: <b>${dailyGoal}/${dailyGoal}</b>${ahead ? ` · ⏩ ${ahead}` : ""}`;
+    }
+    $("goalText").innerHTML = goalHtml;
+    $("goalFill").style.width = Math.min(100, L.today.filled / dailyGoal * 100) + "%";
+    $("goalBox").classList.toggle("done", L.today.done);
     updateQuizPlanUI();
     const today = statsDays[dayKeyAgo(0)] || {};
     const reviewed = today.reviewed || 0, correct = today.correct || 0;
     let week = 0, weekCorrect = 0;
     for (let i = 0; i < 7; i++) { const d = statsDays[dayKeyAgo(i)] || {}; week += d.reviewed || 0; weekCorrect += d.correct || 0; }
+    // Seri: hedefi (defter üzerinden, telafiler dahil) dolan ardışık günler.
+    // Bugün henüz dolmadıysa seri bozulmuş sayılmaz, dünden geriye sayılır.
     let streak = 0;
-    const startIdx = (statsDays[dayKeyAgo(0)]?.reviewed || 0) > 0 ? 0 : 1; // bugün henüz çalışmadıysan seri bozulmuş sayılmaz
-    for (let i = startIdx; i < 400; i++) {
-      if ((statsDays[dayKeyAgo(i)]?.reviewed || 0) > 0) streak++; else break;
+    const doneByAgo = new Map(L.days.map(d => [d.ago, d.done]));
+    for (let i = L.today.done ? 0 : 1; i < 400; i++) {
+      const met = doneByAgo.has(i) ? doneByAgo.get(i) : (statsDays[dayKeyAgo(i)]?.reviewed || 0) >= dailyGoal;
+      if (met) streak++; else break;
     }
     const learned = allQuestions.filter(q => q.learned).length;
     $("statStreak").textContent = `Seri: ${streak} gün${streak >= 3 ? " 🔥" : ""}`;
@@ -2675,6 +2735,14 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       const label = d.i === 0 ? "Bugün" : d.i === 1 ? "Dün" : `${d.i} gün önce`;
       return `<div class="day-bar ${d.i === 0 ? "today" : ""}" style="height:${h}%" title="${label}: ${r} tekrar, ${c} doğru"><div class="fill" style="height:${fill}%"></div></div>`;
     }).join("");
+    const ledgerByAgo = new Map(L.days.map(d => [d.ago, d]));
+    $("dayDots").innerHTML = days.map(d => {
+      const g = ledgerByAgo.get(d.i);
+      const label = d.i === 0 ? "Bugün" : d.i === 1 ? "Dün" : `${d.i} gün önce`;
+      if (!g) return `<div class="day-dot na" title="${label}: hedef takibi başlamadan önce"></div>`;
+      const cls = g.done ? "met" : g.filled > 0 ? "partial" : "";
+      return `<div class="day-dot ${cls}" title="${label}: hedef ${g.filled}/${dailyGoal}"></div>`;
+    }).join("");
   }
 
   // ===================== TOPLU TEST =====================
@@ -2688,8 +2756,11 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
   const quizButtonLabel = () => {
     if (quizPlan === "goal") {
-      const left = dailyGoal - todayReviewed();
-      return left > 0 ? `🎯 Hedefe devam et (${left} kaldı)` : "🎯 Hedef tamam, ekstra çalış";
+      const L = goalLedger();
+      if (L.leftToday > 0) return `🎯 Hedefe devam et (${L.leftToday} kaldı)`;
+      const nextFill = L.aheadPartial;
+      const nextName = L.aheadDays === 0 ? "yarın" : L.aheadDays === 1 ? "öbür gün" : `${L.aheadDays + 1} gün sonrası`;
+      return `⏩ İleriye çalış (${nextName}: ${nextFill}/${dailyGoal})`;
     }
     return quizMode === "rapid" ? "Hızlı teste başla" : "Klinik soru getir";
   };
@@ -2699,7 +2770,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     $("planGoal").classList.toggle("on", goal);
     $("planFree").classList.toggle("on", !goal);
     $("quizPlanHint").textContent = goal
-      ? "Vadesi gelenler arasından önce deneme yanlışları ve son denemede zayıf çıkan dersler gelir; set, hedefte kalan sayıyı aşmaz."
+      ? "Önce deneme yanlışları ve son denemede zayıf çıkan dersler gelir. Fazla çözdüklerin geride kalan günleri, sonra bugünü, sonra sonraki günleri doldurur."
       : "Vadesi gelen spotlardan karışık seçilir.";
     const btn = $("newQuizBtn");
     if (btn && !btn.disabled) btn.textContent = quizButtonLabel();
@@ -2765,13 +2836,13 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     }
     if (!active.length) { alert("Test için arşivinde çalışılacak en az bir spot olmalı."); return null; }
     if (quizPlan === "goal") {
-      const left = dailyGoal - todayReviewed();
-      if (left <= 0 && !confirm("🎯 Bugünkü hedefini tamamladın. Yine de devam etmek ister misin?")) return null;
-      const take = left > 0 ? Math.min(n, left) : n;
+      const left = goalLedger().leftToday;
+      const take = left > 0 ? Math.min(n, left) : n; // hedef doluysa set tam boy gelir, fazlası ileriye yazılır
       let goalPool = active.filter(q => q.nextReview <= now);
-      if (!goalPool.length) {
-        if (!confirm("Bugün vadesi gelen spot yok. Yine de çalışmak ister misin?")) return null;
-        goalPool = [...active];
+      if (goalPool.length < take) {
+        // Vadesi gelenler yetmezse en yakın vadeli spotlarla tamamla (ileriye çalışma).
+        const upcoming = active.filter(q => q.nextReview > now).sort((a, b) => a.nextReview - b.nextReview);
+        goalPool = [...goalPool, ...upcoming.slice(0, take - goalPool.length)];
       }
       const weak = weakBranchSet();
       const top = goalPool.map(q => ({ q, s: priorityScore(q, weak, now) }))
@@ -2943,6 +3014,11 @@ ${spots}
 Yalnızca JSON döndür.`;
   }
 
+  // Soru kartının başını ekranın üstüne getirir (ayar kartları yukarıda kalır).
+  function scrollToQuiz() {
+    requestAnimationFrame(() => $("quizContainer").scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
   function showQuizQuestion() {
     const { src, data } = quizQueue[quizIndex];
     activeQuizQuestion = allQuestions.find(q => q.id === src.id) || src;
@@ -3029,7 +3105,7 @@ Yalnızca JSON döndür.`;
     if (quizIndex + 1 < quizQueue.length) {
       quizIndex++;
       showQuizQuestion();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToQuiz();
     } else {
       generateQuiz();
     }
@@ -3052,6 +3128,7 @@ Yalnızca JSON döndür.`;
     $("quizResult").classList.add("hidden");
     $("quizSubBadge").textContent = "";
     $("quizStreakBadge").textContent = "";
+    scrollToQuiz();
 
     quizQueue = [];
     const ready = new Map();   // spot id -> soru
@@ -3124,6 +3201,7 @@ Yalnızca JSON döndür.`;
       }
       quizIndex = 0;
       showQuizQuestion();
+      scrollToQuiz();
     } catch (err) {
       $("quizQuestion").textContent = "Soru üretilemedi: " + err.message;
       $("quizOptions").innerHTML = "";
@@ -3150,6 +3228,7 @@ Yalnızca JSON döndür.`;
     if (!isCorrect) btns.forEach(b => { if (b.dataset.key === correctKey) b.classList.add("right"); });
 
     const q = activeQuizQuestion;
+    const ledgerBefore = goalLedger();
     const qRef = doc(db, COL, q.id);
     const oldBox = q.box || 0;
     let note = "";
@@ -3191,7 +3270,10 @@ Yalnızca JSON döndür.`;
       note = "İlerleme kaydedilemedi (bağlantını kontrol et). " + note;
     }
 
-    if (todayReviewed() === dailyGoal) note += " 🎯 Bugünkü hedefini tamamladın!";
+    const ledgerAfter = goalLedger();
+    if (ledgerBefore.backlog > 0 && ledgerAfter.backlog === 0) note += " ✓ Geride kalan günlerin hedefi kapandı.";
+    if (ledgerBefore.leftToday > 0 && ledgerAfter.leftToday === 0) note += " 🎯 Bugünkü hedef tamam! Bundan sonrası yarına yazılır.";
+    else if (ledgerAfter.aheadDays > ledgerBefore.aheadDays) note += ledgerAfter.aheadDays === 1 ? " ⏩ Yarının hedefi de tamam!" : ` ⏩ ${ledgerAfter.aheadDays} gün ileriye hedef tamam!`;
     const res = $("quizResult");
     res.className = isCorrect ? "right" : "wrong";
     $("quizResultTitle").textContent = isCorrect ? `Doğru, cevap ${correctKey}` : `Yanlış, doğru cevap ${correctKey}`;

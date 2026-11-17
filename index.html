@@ -469,6 +469,7 @@
       <div class="seg">
         <button id="statusActive" class="on" onclick="setStatus('active')">Çalışılacak <span id="cntActive">0</span></button>
         <button id="statusLearned" onclick="setStatus('learned')">Öğrenilen <span id="cntLearned">0</span></button>
+        <button id="statusArchived" onclick="setStatus('archived')">Arşiv <span id="cntArchived">0</span></button>
       </div>
 
       <input id="archiveSearch" type="search" placeholder="Spot, açıklama veya konu ara…" oninput="setSearch(this.value)" aria-label="Arşivde ara">
@@ -486,7 +487,7 @@
       <div class="bar">
         <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
         <button class="link" onclick="exportSpotsJson()">JSON dışa aktar</button>
-        <button class="link danger" onclick="deleteAllSpots()">Hepsini sil</button>
+        <button class="link" id="bulkArchiveBtn" onclick="bulkArchiveToggle()">Hepsini arşivle</button>
       </div>
     </section>
 
@@ -2417,11 +2418,12 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   };
 
   function refreshAll() {
-    const active = allQuestions.filter(q => !q.learned);
+    const active = allQuestions.filter(q => !q.learned && !q.archived);
     const due = active.filter(q => q.nextReview <= Date.now()).length;
     $("archiveCount").textContent = active.length;
     $("cntActive").textContent = active.length;
-    $("cntLearned").textContent = allQuestions.length - active.length;
+    $("cntLearned").textContent = allQuestions.filter(q => q.learned && !q.archived).length;
+    $("cntArchived").textContent = allQuestions.filter(q => q.archived).length;
     $("dueCount").textContent = due;
     $("dueBadge").textContent = due;
     $("dueBadge").classList.toggle("hidden", due === 0);
@@ -2429,66 +2431,15 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     if (allExams.length) renderExams(); // karne ↔ soru bağlantı özetleri güncel kalsın
   }
 
-  // ===================== TÜM SPOTLARI SİLME =====================
-  // Firebase'den ve Telegram'dan arşivdeki bütün spotları siler. Deneme karneleri (tus_exams) ve
-  // günlük istatistikler silinmez. İki onay ister; ikinci onayda "SIL" yazılması gerekir.
-  window.deleteAllSpots = async () => {
-    if (analyzing) return;
-    const targets = allQuestions.map(q => ({ id: q.id, keyTakeaway: q.keyTakeaway || "" }));
-    if (!targets.length) { alert("Silinecek spot yok."); return; }
-    if (!confirm(`Arşivdeki ${targets.length} spot kalıcı olarak silinecek (web arşivi ve Telegram).\n\nBu işlem geri alınamaz. Önce "JSON dışa aktar" ile yedek almanı öneririm.\n\nDevam edilsin mi?`)) return;
-    const typed = prompt(`Onaylamak için büyük harflerle SIL yaz (${targets.length} spot silinecek):`);
-    if (typed !== "SIL") { alert("İptal edildi. Hiçbir şey silinmedi."); return; }
-
-    analyzing = true;
-    const listBox = $("questionsList");
-    const setProgress = text => { listBox.innerHTML = `<div class="empty"><span class="spin"></span><br>${esc(text)}</div>`; };
-    const deletedIds = [];
-    let firestoreError = null;
-    try {
-      // 1) Firebase: 400'lük gruplar halinde (Firestore toplu işlem sınırı 500).
-      for (let i = 0; i < targets.length; i += 400) {
-        const chunk = targets.slice(i, i + 400);
-        setProgress(`Web arşivinden siliniyor… ${Math.min(i + chunk.length, targets.length)}/${targets.length}`);
-        const batch = writeBatch(db);
-        chunk.forEach(t => batch.delete(doc(db, COL, t.id)));
-        await batch.commit();
-        deletedIds.push(...chunk);
-      }
-    } catch (err) {
-      firestoreError = err;
-    }
-
-    // 2) Telegram: yalnızca Firebase'den gerçekten silinenler için, 8'erli paralel.
-    // Firebase'de kalan kayıtların Telegram'daki karşılığı korunur; böylece iki taraf tutarlı kalır.
-    try {
-      for (let i = 0; i < deletedIds.length; i += 8) {
-        setProgress(`Telegram'dan siliniyor… ${Math.min(i + 8, deletedIds.length)}/${deletedIds.length}`);
-        await Promise.all(deletedIds.slice(i, i + 8).map(t => deleteFromTelegramBot(t.keyTakeaway, t.id)));
-      }
-    } catch (err) { console.warn("Telegram toplu silme hatası:", err); }
-
-    analyzing = false;
-    quizQueue = []; activeQuizQuestion = null; currentQuizData = null;
-    $("quizContainer").classList.add("hidden");
-    await loadUserQuestions();
-
-    if (firestoreError) {
-      alert(`Silme yarıda kaldı: ${deletedIds.length} spot silindi, geri kalanlar için tekrar dene.\nHata: ${firestoreError.message}`);
-    } else {
-      alert(`${deletedIds.length} spot silindi.`);
-    }
-  };
-
   // ===================== JSON DIŞA AKTARMA =====================
   // Tüm spotları (tekrar durumu, not ve deneme bilgisiyle) ve günlük tekrar istatistiklerini tek dosyada indirir.
   // Test soruları önbelleği (quizCache) dosya boyutunu şişirmemek için dahil edilmez.
-  window.exportSpotsJson = () => {
+  window.exportSpotsJson = async () => {
     const now = Date.now();
     const toIso = ms => (ms ? new Date(ms).toISOString() : null);
     const spots = allQuestions.map(q => {
       const subTopic = q.subTopicRaw ?? String(q.subTopic || "").replace(/^\[Soru [^\]]*\]\s*/, "");
-      const status = q.learned ? "learned" : (q.nextReview <= now ? "due" : "scheduled");
+      const status = q.archived ? "archived" : q.learned ? "learned" : (q.nextReview <= now ? "due" : "scheduled");
       return {
         id: q.id,
         branch: q.branch || "",
@@ -2502,7 +2453,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
           errorType: q.errorType || "", myAnswer: q.myAnswer || "", correctAnswer: q.correctAnswer || "",
           difficulty: q.difficulty || "", confidence: q.confidence || "" },
         review: {
-          status,                       // learned | due | scheduled
+          status,                       // archived | learned | due | scheduled
           level: q.box || 0,            // 0-6
           maxLevel: MAX_STREAK,
           nextReview: q.nextReview || 0,
@@ -2517,8 +2468,9 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
       exportedAt: new Date().toISOString(),
       summary: {
         totalSpots: spots.length,
-        active: spots.filter(s => s.review.status !== "learned").length,
+        active: spots.filter(s => s.review.status === "due" || s.review.status === "scheduled").length,
         learned: spots.filter(s => s.review.status === "learned").length,
+        archived: spots.filter(s => s.review.status === "archived").length,
         dueNow: spots.filter(s => s.review.status === "due").length
       },
       dailyGoal,
@@ -2534,12 +2486,71 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    // İndirme başladıktan sonra aktif spotları arşive taşı (tekrar testine girmesinler).
+    const toArchive = allQuestions.filter(q => !q.learned && !q.archived);
+    if (toArchive.length) {
+      try {
+        await setArchivedBulk(toArchive, true);
+        alert(`JSON indirildi. ${toArchive.length} spot arşive taşındı. Arşiv sekmesinden istediğin zaman aktif edebilirsin.`);
+      } catch (e) {
+        alert("JSON indirildi ama arşivleme yarıda kaldı: " + e.message + "\nTekrar deneyebilirsin.");
+      }
+      refreshAll();
+    }
   };
+
+  // ===================== ARŞİVLEME =====================
+  // archived: true olan spotlar tekrar testine ve Test sayacına girmez, Telegram'dan kaldırılır.
+  // Aktif edilince yeniden Telegram'a eklenir. Firestore'da alan olarak tutulur, silinmez.
+  async function setArchivedBulk(list, flag) {
+    for (let i = 0; i < list.length; i += 400) {
+      const chunk = list.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(q => batch.update(doc(db, COL, q.id), { archived: flag }));
+      await batch.commit();
+      chunk.forEach(q => { q.archived = flag; });
+    }
+    for (let i = 0; i < list.length; i += 8) {
+      await Promise.all(list.slice(i, i + 8).map(q =>
+        flag ? deleteFromTelegramBot(q.keyTakeaway, q.id) : sendToTelegramBot(q.id, q)));
+    }
+  }
+
+  window.setArchivedOne = async (docId, flag) => {
+    const q = allQuestions.find(x => x.id === docId);
+    if (!q) return;
+    try { await setArchivedBulk([q], flag); }
+    catch (e) { alert("Güncellenemedi: " + e.message); }
+    refreshAll();
+  };
+
+  window.bulkArchiveToggle = async () => {
+    if (analyzing) return;
+    const toActive = selectedStatus === "archived";
+    const targets = allQuestions.filter(q => toActive ? q.archived : (!q.learned && !q.archived));
+    if (!targets.length) { alert(toActive ? "Arşivde spot yok." : "Arşivlenecek aktif spot yok."); return; }
+    const msg = toActive
+      ? `${targets.length} spot aktif listeye geri alınacak ve Telegram'a yeniden eklenecek. Devam edilsin mi?`
+      : `${targets.length} spot arşive taşınacak; tekrar testine girmeyecek ve Telegram'dan kaldırılacak. Devam edilsin mi?`;
+    if (!confirm(msg)) return;
+    analyzing = true;
+    try { await setArchivedBulk(targets, !toActive); }
+    catch (e) { alert("İşlem yarıda kaldı: " + e.message); }
+    analyzing = false;
+    refreshAll();
+  };
+
+  function updateBulkButton() {
+    const b = $("bulkArchiveBtn");
+    if (b) b.textContent = selectedStatus === "archived" ? "Hepsini aktif et" : "Hepsini arşivle";
+  }
 
   window.setStatus = (s) => {
     selectedStatus = s; selectedBranchFilter = "All"; editingId = null;
     $("statusActive").classList.toggle("on", s === "active");
     $("statusLearned").classList.toggle("on", s === "learned");
+    $("statusArchived").classList.toggle("on", s === "archived");
     renderFilters(); renderQuestions();
   };
 
@@ -2565,7 +2576,9 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   }
 
   const inStatus = () => allQuestions.filter(q => {
-    const statusOk = selectedStatus === "learned" ? q.learned : !q.learned;
+    const statusOk = selectedStatus === "archived" ? q.archived === true
+      : selectedStatus === "learned" ? (q.learned === true && !q.archived)
+      : (!q.learned && !q.archived);
     const typeOk = selectedTypeFilter === "ALL" || (q.sourceType || "question") === selectedTypeFilter;
     return statusOk && typeOk;
   });
@@ -2680,6 +2693,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
   }
 
   function renderQuestions() {
+    updateBulkButton();
     const base = inStatus();
     const byBranch = selectedBranchFilter === "All" ? base : base.filter(q => q.branch === selectedBranchFilter);
     const filtered = byBranch.filter(matchesSearch);
@@ -2701,6 +2715,9 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
           <span class="meta">Seviye ${q.box}/${MAX_STREAK}, ${reviewLabel(q)}</span>
           <div class="actions">
             ${q.learned ? `<button class="link" onclick="reactivateQuestion('${esc(q.id)}')">Tekrar aktif et</button>` : ""}
+            ${q.learned ? "" : q.archived
+              ? `<button class="link" onclick="setArchivedOne('${esc(q.id)}', false)">Aktif et</button>`
+              : `<button class="link" onclick="setArchivedOne('${esc(q.id)}', true)">Arşivle</button>`}
             <button class="link" onclick="startEdit('${esc(q.id)}')">Düzenle</button>
             <button class="link danger" onclick="deleteQuestion('${esc(q.id)}')">Sil</button>
           </div>
@@ -2940,7 +2957,7 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
 
   function pickQuestions(n) {
     const now = Date.now();
-    let active = allQuestions.filter(q => !q.learned);
+    let active = allQuestions.filter(q => !q.learned && !q.archived);
     if (quizSourceFilter === "exam") {
       active = active.filter(q => q.sourceType === "exam");
       if (!active.length) { alert("Henüz 'Deneme Yanlışı' olarak kaydedilmiş aktif bir spotun yok."); return null; }

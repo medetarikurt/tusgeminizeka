@@ -486,6 +486,7 @@
       <div class="bar">
         <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
         <button class="link" onclick="exportSpotsJson()">JSON dışa aktar</button>
+        <button class="link danger" onclick="deleteAllSpots()">Hepsini sil</button>
       </div>
     </section>
 
@@ -599,7 +600,7 @@
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
   import {
     getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, increment
+    collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, increment, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -2427,6 +2428,57 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     renderFilters(); renderQuestions(); renderExamInsights(); renderStats();
     if (allExams.length) renderExams(); // karne ↔ soru bağlantı özetleri güncel kalsın
   }
+
+  // ===================== TÜM SPOTLARI SİLME =====================
+  // Firebase'den ve Telegram'dan arşivdeki bütün spotları siler. Deneme karneleri (tus_exams) ve
+  // günlük istatistikler silinmez. İki onay ister; ikinci onayda "SIL" yazılması gerekir.
+  window.deleteAllSpots = async () => {
+    if (analyzing) return;
+    const targets = allQuestions.map(q => ({ id: q.id, keyTakeaway: q.keyTakeaway || "" }));
+    if (!targets.length) { alert("Silinecek spot yok."); return; }
+    if (!confirm(`Arşivdeki ${targets.length} spot kalıcı olarak silinecek (web arşivi ve Telegram).\n\nBu işlem geri alınamaz. Önce "JSON dışa aktar" ile yedek almanı öneririm.\n\nDevam edilsin mi?`)) return;
+    const typed = prompt(`Onaylamak için büyük harflerle SIL yaz (${targets.length} spot silinecek):`);
+    if (typed !== "SIL") { alert("İptal edildi. Hiçbir şey silinmedi."); return; }
+
+    analyzing = true;
+    const listBox = $("questionsList");
+    const setProgress = text => { listBox.innerHTML = `<div class="empty"><span class="spin"></span><br>${esc(text)}</div>`; };
+    const deletedIds = [];
+    let firestoreError = null;
+    try {
+      // 1) Firebase: 400'lük gruplar halinde (Firestore toplu işlem sınırı 500).
+      for (let i = 0; i < targets.length; i += 400) {
+        const chunk = targets.slice(i, i + 400);
+        setProgress(`Web arşivinden siliniyor… ${Math.min(i + chunk.length, targets.length)}/${targets.length}`);
+        const batch = writeBatch(db);
+        chunk.forEach(t => batch.delete(doc(db, COL, t.id)));
+        await batch.commit();
+        deletedIds.push(...chunk);
+      }
+    } catch (err) {
+      firestoreError = err;
+    }
+
+    // 2) Telegram: yalnızca Firebase'den gerçekten silinenler için, 8'erli paralel.
+    // Firebase'de kalan kayıtların Telegram'daki karşılığı korunur; böylece iki taraf tutarlı kalır.
+    try {
+      for (let i = 0; i < deletedIds.length; i += 8) {
+        setProgress(`Telegram'dan siliniyor… ${Math.min(i + 8, deletedIds.length)}/${deletedIds.length}`);
+        await Promise.all(deletedIds.slice(i, i + 8).map(t => deleteFromTelegramBot(t.keyTakeaway, t.id)));
+      }
+    } catch (err) { console.warn("Telegram toplu silme hatası:", err); }
+
+    analyzing = false;
+    quizQueue = []; activeQuizQuestion = null; currentQuizData = null;
+    $("quizContainer").classList.add("hidden");
+    await loadUserQuestions();
+
+    if (firestoreError) {
+      alert(`Silme yarıda kaldı: ${deletedIds.length} spot silindi, geri kalanlar için tekrar dene.\nHata: ${firestoreError.message}`);
+    } else {
+      alert(`${deletedIds.length} spot silindi.`);
+    }
+  };
 
   // ===================== JSON DIŞA AKTARMA =====================
   // Tüm spotları (tekrar durumu, not ve deneme bilgisiyle) ve günlük tekrar istatistiklerini tek dosyada indirir.

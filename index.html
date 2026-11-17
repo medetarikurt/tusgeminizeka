@@ -483,7 +483,10 @@
 
       <div id="branchFilters" class="chips"></div>
       <div id="questionsList"><div class="empty">Yükleniyor</div></div>
-      <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
+      <div class="bar">
+        <button class="link" onclick="loadUserQuestions()">Listeyi yenile</button>
+        <button class="link" onclick="exportSpotsJson()">JSON dışa aktar</button>
+      </div>
     </section>
 
     <!-- 4. SEKME: TEST -->
@@ -2424,6 +2427,62 @@ Kullanıcı Notu / Soru Metni: ${chunkText}
     renderFilters(); renderQuestions(); renderExamInsights(); renderStats();
     if (allExams.length) renderExams(); // karne ↔ soru bağlantı özetleri güncel kalsın
   }
+
+  // ===================== JSON DIŞA AKTARMA =====================
+  // Tüm spotları (tekrar durumu, not ve deneme bilgisiyle) ve günlük tekrar istatistiklerini tek dosyada indirir.
+  // Test soruları önbelleği (quizCache) dosya boyutunu şişirmemek için dahil edilmez.
+  window.exportSpotsJson = () => {
+    const now = Date.now();
+    const toIso = ms => (ms ? new Date(ms).toISOString() : null);
+    const spots = allQuestions.map(q => {
+      const subTopic = q.subTopicRaw ?? String(q.subTopic || "").replace(/^\[Soru [^\]]*\]\s*/, "");
+      const status = q.learned ? "learned" : (q.nextReview <= now ? "due" : "scheduled");
+      return {
+        id: q.id,
+        branch: q.branch || "",
+        topic: q.topic || "",
+        subTopic,
+        keyTakeaway: q.keyTakeaway || "",
+        explanation: q.aiExplanation || "",
+        personalNote: q.personalNote || "",
+        source: { type: q.sourceType || "question", examStatus: q.examStatus || "", questionNo: q.questionNo || "",
+          examKey: q.examKey || "", examTitle: q.examTitle || "", examDate: q.examDate || "",
+          errorType: q.errorType || "", myAnswer: q.myAnswer || "", correctAnswer: q.correctAnswer || "",
+          difficulty: q.difficulty || "", confidence: q.confidence || "" },
+        review: {
+          status,                       // learned | due | scheduled
+          level: q.box || 0,            // 0-6
+          maxLevel: MAX_STREAK,
+          nextReview: q.nextReview || 0,
+          nextReviewDate: toIso(q.nextReview),
+          learned: q.learned === true
+        },
+        createdAt: toIso(q.sortTime)
+      };
+    });
+    const payload = {
+      app: "TUS Asistanı",
+      exportedAt: new Date().toISOString(),
+      summary: {
+        totalSpots: spots.length,
+        active: spots.filter(s => s.review.status !== "learned").length,
+        learned: spots.filter(s => s.review.status === "learned").length,
+        dueNow: spots.filter(s => s.review.status === "due").length
+      },
+      dailyGoal,
+      dailyStats: statsDays,        // { "dYYYYMMDD": { reviewed, correct } }
+      spots
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tus-spotlar-${dayKey()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
 
   window.setStatus = (s) => {
     selectedStatus = s; selectedBranchFilter = "All"; editingId = null;

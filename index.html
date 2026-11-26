@@ -262,7 +262,7 @@
 
 <div class="container">
     <div id="toast">✅ Kaydedildi</div>
-    <h1>TUS Sarmal Takip</h1>
+    <h1>TUS Sarmal Takip <span style="font-size:11px; color:var(--text-muted); font-weight:500; vertical-align:middle;">v6</span></h1>
     <div class="countdown-banner" id="countdown-banner">📅 Hesaplanıyor...</div>
     
     <div class="tabs">
@@ -1180,9 +1180,7 @@
         if (gunBilgisi[dateStr] && gunBilgisi[dateStr].durum === 'normal') {
             const gv = calismaGunleri[gunBilgisi[dateStr].workDaySayaci - 1];
             if (gv && tur1OzelDurum[gv.ders]) {
-                const bdSayi = globalBransSayilari[planData[gv.ders].isim] || 0;
-                const bdMetin = bdSayi > 0 ? ` • Toplam ${bdSayi} Branş Denemesi çözüldü` : "";
-                document.getElementById("tur-gecmisi-kisa-metin").innerText = `${tur1OzelDurum[gv.ders].metin}${bdMetin}`;
+                document.getElementById("tur-gecmisi-kisa-metin").innerText = `${tur1OzelDurum[gv.ders].metin}`;
                 document.getElementById("tur-gecmisi-kisa").style.display = "block";
             } else {
                 document.getElementById("tur-gecmisi-kisa").style.display = "none";

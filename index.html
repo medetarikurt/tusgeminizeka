@@ -614,11 +614,12 @@
     let globalGunlukKayitlar = {};
     let globalBransSayilari = {};
 
-    // 3. Tur: Biyo/Farma (Tam Konu 2g+Soru 2g), Fizyo (Selektif 1g+Soru 2g), Mikro (Selektif 2g+Soru 2g), Pedo/Dahiliye (Selektif 2g+Soru 3g), Diğerleri Full Soru
+    // 3. Tur: Fizyo Konu (1g) -> Pato Soru (2g) -> Fizyo Soru (2g) -> Biyo Konu (2g) -> sarmal devam
     const t3 = [
-        { d: 'fizyoloji', g: 3, konuG: 1, selektifKonu: true, sadeceSoru: false },   // 1g Fizyo selektif + 2g K.Doğum (T2) soru
-        { d: 'patoloji', g: 2, sadeceSoru: true },
-        { d: 'biyokimya', g: 4, konuG: 2, sadeceSoru: false },                       // 2g Biyo konu + 2g Fizyo (T3) soru
+        { d: 'fizyoloji', g: 1, konuG: 1, selektifKonu: true, sadeceSoru: false },   // 1g Fizyo selektif konu
+        { d: 'patoloji', g: 2, sadeceSoru: true },                                   // 2g Pato soru
+        { d: 'fizyoloji', g: 2, sadeceSoru: true, sarmalSoru: true },                // 2g Fizyo (T3) soru
+        { d: 'biyokimya', g: 2, konuG: 2, sadeceSoru: false },                       // 2g Biyo konu
         { d: 'pediatri', g: 4, konuG: 2, selektifKonu: true, sadeceSoru: false },    // 2g Pedo selektif + 2g Biyo (T3) soru
         { d: 'mikrobiyoloji', g: 5, konuG: 2, selektifKonu: true, sadeceSoru: false }, // 2g Mikro selektif + 3g Pedo (T3) soru
         { d: 'farmakoloji', g: 4, konuG: 2, sadeceSoru: false },                     // 2g Farma konu + 2g Mikro (T3) soru
@@ -628,29 +629,33 @@
         { d: 'kadindogum', g: 1, sadeceSoru: true }
     ];
 
-    // 4. Tur: Dahiliye (3g) ve Pediatri (3g) Full Soru; Fizyo ve Mikro soruları 1'er gün
+    // 4. Tur: Önce Dahiliye (T3) 3g soru kapanır, sonra Fizyo Konu (1g) -> Pato (2g) -> Fizyo Soru (1g) -> Biyo Konu (2g)
     const t4 = [
-        { d: 'fizyoloji', g: 4, konuG: 1, selektifKonu: true, sadeceSoru: false },   // 1g Fizyo selektif + 3g Dahiliye (T3) soru
-        { d: 'patoloji', g: 2, sadeceSoru: true },
-        { d: 'biyokimya', g: 3, konuG: 2, sadeceSoru: false },                       // 2g Biyo konu + 1g Fizyo (T4) soru
-        { d: 'pediatri', g: 3, sadeceSoru: true },
+        { d: 'dahiliye', g: 3, sadeceSoru: true, soruTur: 3, sarmalSoru: true },     // 3g Dahiliye (T3) soru
+        { d: 'fizyoloji', g: 1, konuG: 1, selektifKonu: true, sadeceSoru: false },   // 1g Fizyo selektif konu
+        { d: 'patoloji', g: 2, sadeceSoru: true },                                   // 2g Pato soru
+        { d: 'fizyoloji', g: 1, sadeceSoru: true, sarmalSoru: true },                // 1g Fizyo (T4) soru
+        { d: 'biyokimya', g: 2, konuG: 2, sadeceSoru: false },                       // 2g Biyo konu
+        { d: 'pediatri', g: 3, sadeceSoru: true },                                   // 3g Pedo (T4) soru
         { d: 'mikrobiyoloji', g: 4, konuG: 2, selektifKonu: true, sadeceSoru: false }, // 2g Mikro selektif + 2g Biyo (T4) soru
         { d: 'farmakoloji', g: 3, konuG: 2, sadeceSoru: false },                     // 2g Farma konu + 1g Mikro (T4) soru
-        { d: 'dahiliye', g: 3, sadeceSoru: true },
+        { d: 'dahiliye', g: 3, sadeceSoru: true },                                   // 3g Dahiliye (T4) soru
         { d: 'kucukstajlar', g: 2, sadeceSoru: true },
         { d: 'genelcerrahi', g: 2, sadeceSoru: true },
         { d: 'kadindogum', g: 1, sadeceSoru: true }
     ];
 
-    // 5. Tur: Fizyoloji bloğunda Farmakoloji (T4) 2g soru; Fizyo ve Mikro soruları 1'er gün
+    // 5. Tur: Önce Farmakoloji (T4) 2g soru kapanır, sonra Fizyo Konu (1g) -> Pato (2g) -> Fizyo Soru (1g) -> Biyo Konu (2g)
     const t5 = [
-        { d: 'fizyoloji', g: 3, konuG: 1, selektifKonu: true, sadeceSoru: false },   // 1g Fizyo selektif + 2g Farma (T4) soru
-        { d: 'patoloji', g: 2, sadeceSoru: true },
-        { d: 'biyokimya', g: 3, konuG: 2, sadeceSoru: false },                       // 2g Biyo konu + 1g Fizyo (T5) soru
-        { d: 'pediatri', g: 3, sadeceSoru: true },
+        { d: 'farmakoloji', g: 2, sadeceSoru: true, soruTur: 4, sarmalSoru: true },  // 2g Farma (T4) soru
+        { d: 'fizyoloji', g: 1, konuG: 1, selektifKonu: true, sadeceSoru: false },   // 1g Fizyo selektif konu
+        { d: 'patoloji', g: 2, sadeceSoru: true },                                   // 2g Pato soru
+        { d: 'fizyoloji', g: 1, sadeceSoru: true, sarmalSoru: true },                // 1g Fizyo (T5) soru
+        { d: 'biyokimya', g: 2, konuG: 2, sadeceSoru: false },                       // 2g Biyo konu
+        { d: 'pediatri', g: 3, sadeceSoru: true },                                   // 3g Pedo (T5) soru
         { d: 'mikrobiyoloji', g: 4, konuG: 2, selektifKonu: true, sadeceSoru: false }, // 2g Mikro selektif + 2g Biyo (T5) soru
         { d: 'farmakoloji', g: 3, konuG: 2, sadeceSoru: false },                     // 2g Farma konu + 1g Mikro (T5) soru
-        { d: 'dahiliye', g: 3, sadeceSoru: true },
+        { d: 'dahiliye', g: 3, sadeceSoru: true },                                   // 3g Dahiliye (T5) soru
         { d: 'kucukstajlar', g: 2, sadeceSoru: true },
         { d: 'genelcerrahi', g: 2, sadeceSoru: true },
         { d: 'kadindogum', g: 1, sadeceSoru: true }
@@ -671,8 +676,8 @@
             {d:'farmakoloji',g:4, sadeceSoru:false},
             {d:'dahiliye',g:5, sadeceSoru:false},
             {d:'kucukstajlar',g:2, sadeceSoru:true},
-            {d:'genelcerrahi',g:4, sadeceSoru:false},
-            {d:'kadindogum',g:4, sadeceSoru:false}
+            {d:'genelcerrahi',g:5, konuG:2, sadeceSoru:false},
+            {d:'kadindogum',g:3, konuG:1, sadeceSoru:false}
         ]},
         { tur: 3, seq: t3 }, { tur: 4, seq: t4 }, { tur: 5, seq: t5 }
     ];
@@ -685,11 +690,12 @@
     sarmalAkil.forEach(t => { 
         t.seq.forEach(s => { 
             const dersIsim = planData[s.d].isim;
-            hedefGunler[t.tur][dersIsim] = s.g;
-            sadeceSoruMap[t.tur][dersIsim] = !!s.sadeceSoru;
-            selektifMap[t.tur][dersIsim] = !!s.selektifKonu;
+            if (!s.soruTur) {
+                hedefGunler[t.tur][dersIsim] = (hedefGunler[t.tur][dersIsim] || 0) + s.g;
+                if (s.selektifKonu) selektifMap[t.tur][dersIsim] = true;
+            }
             for(let i=1; i<=s.g; i++) {
-                calismaGunleri.push({ tur: t.tur, ders: s.d, gun: i, toplamGun: s.g, konuGun: s.konuG || null, sadeceSoru: !!s.sadeceSoru, selektifKonu: !!s.selektifKonu });
+                calismaGunleri.push({ tur: t.tur, ders: s.d, gun: i, toplamGun: s.g, konuGun: s.konuG || null, soruTur: s.soruTur || null, sarmalSoru: !!s.sarmalSoru, sadeceSoru: !!s.sadeceSoru, selektifKonu: !!s.selektifKonu });
             } 
         }); 
     });
@@ -747,7 +753,8 @@
     // (Turun ilk dersi, önceki turun son Konu+Soru dersinin sorusunu çözer; o soru ÖNCEKİ turun sorusudur.)
     function soruHedefiBul(tur, dersKey) {
         const sarmalTur = sarmalAkil.find(t => t.tur === tur);
-        const seqIdx = sarmalTur.seq.findIndex(s => s.d === dersKey);
+        let seqIdx = sarmalTur.seq.findIndex(s => s.d === dersKey && !s.sadeceSoru);
+        if (seqIdx === -1) seqIdx = sarmalTur.seq.findIndex(s => s.d === dersKey);
 
         if (tur === 1 || (tur === 2 && seqIdx <= 2)) {
             if (seqIdx > 0) return { d: sarmalTur.seq[seqIdx - 1].d, tur: tur };
@@ -792,7 +799,7 @@
             const g = { w: w, tur: a.tur, ders: a.ders, mod: mod, konu: null, soru: null };
             if (mod === 'birlesik' || mod === 'sadece_konu') g.konu = { tur: a.tur, d: a.ders };
             if (mod === 'birlesik' || mod === 'onceki_soru') g.soru = soruHedefiBul(a.tur, a.ders);
-            if (mod === 'kendi_sorusu') g.soru = { tur: a.tur, d: a.ders };
+            if (mod === 'kendi_sorusu') g.soru = { tur: a.soruTur || a.tur, d: a.ders };
             gunGorevleri.push(g);
             if (g.konu) planKonu[g.konu.tur][planData[g.konu.d].isim]++;
             if (g.soru) planSoru[g.soru.tur][planData[g.soru.d].isim]++;
@@ -1104,8 +1111,7 @@
 
             for (let t = 1; t <= 5; t++) {
                 const manuelNot = (userEnvanter[dersKey] && userEnvanter[dersKey][t]) ? String(userEnvanter[dersKey][t]).trim() : "";
-                const sadeceSoruMu = sadeceSoruMap[t][dersAd];
-                const selektifMi = selektifMap[t][dersAd];
+                const selektifMi = !!selektifMap[t][dersAd];
 
                 let otoMetin = "";
                 let hucreSinif = "env-hucre";
@@ -1115,6 +1121,7 @@
                     hucreSinif += " env-hucre-tam";
                 } else {
                     const h = hucreDurumu(t, dersAd, yap);
+                    const sadeceSoruMu = !h.konuGerek && h.soruGerek;
                     const hedefGun = hedefGunler[t][dersAd] || 0;
                     const hepsiTamam = (h.konuGerek || h.soruGerek) && h.konuTamam && h.soruTamam;
 
@@ -1479,7 +1486,8 @@
                 let sBi = aktif.gun * gSoru;
                 if (sBi > soruVeri.soru || aktif.gun === aktif.toplamGun) sBi = soruVeri.soru;
 
-                document.getElementById("soru-sayfa").innerText = `${soruVeri.soruK} - Sadece Soru Modu (Sf ${sB} - ${sBi}) [${aktif.gun}/${aktif.toplamGun}. Gün]` + soruYukUyarisi(sBi - sB + 1);
+                const soruModEtiket = aktif.sarmalSoru ? (aktif.soruTur && aktif.soruTur !== aktif.tur ? `Sarmal Soru (${aktif.soruTur}. Tur)` : `Sarmal Soru`) : `Sadece Soru Modu`;
+                document.getElementById("soru-sayfa").innerText = `${soruVeri.soruK} - ${soruModEtiket} (Sf ${sB} - ${sBi}) [${aktif.gun}/${aktif.toplamGun}. Gün]` + soruYukUyarisi(sBi - sB + 1);
 
                 const soruYuzde = Math.min(100, (aktif.gun / aktif.toplamGun) * 100);
                 document.getElementById("soru-progress").style.width = soruYuzde + "%";
